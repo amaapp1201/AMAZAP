@@ -20,9 +20,9 @@ import {
 import {
   ColumnChart,
   LineChart,
-  MAX_SERIES,
+  DEFAULT_SERIES,
   RankedBars,
-  SERIES_COLORS,
+  SeriesSwatch,
 } from "./charts";
 import { AnalyticsData, AnalyticsEventOption } from "./types";
 
@@ -362,7 +362,7 @@ function PointsView({
           points: pointSeries.get(entity.key)?.cumulative[cutoffIndex] ?? 0,
         }))
         .sort((a, b) => b.points - a.points)
-        .slice(0, MAX_SERIES)
+        .slice(0, DEFAULT_SERIES)
         .map((item) => item.key),
     [entities, pointSeries, cutoffIndex],
   );
@@ -372,9 +372,7 @@ function PointsView({
     onSelectedKeysChange(
       selectedKeys.includes(key)
         ? selectedKeys.filter((k) => k !== key)
-        : selectedKeys.length >= MAX_SERIES
-          ? selectedKeys
-          : [...selectedKeys, key],
+        : [...selectedKeys, key],
     );
   };
 
@@ -417,10 +415,39 @@ function PointsView({
       </Panel>
       <Panel
         title={`日ごとの${metricName}`}
+        action={
+          <span className="inline-flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">
+              グラフに表示: {selectedKeys.length}件
+            </span>
+            <button
+              type="button"
+              className="rounded border px-2 py-1 hover:bg-slate-100"
+              onClick={() =>
+                onSelectedKeysChange([
+                  // すでに選んでいるものの順（色）は変えず、残りを表の並び順で足す
+                  ...selectedKeys,
+                  ...rows
+                    .map((row) => row.entity.key)
+                    .filter((key) => !selectedKeys.includes(key)),
+                ])
+              }
+            >
+              すべて選ぶ
+            </button>
+            <button
+              type="button"
+              className="rounded border px-2 py-1 hover:bg-slate-100"
+              onClick={() => onSelectedKeysChange([])}
+            >
+              すべて外す
+            </button>
+          </span>
+        }
         note={
           isSteps
-            ? `グラフに出す対象は、チェックボックスで ${MAX_SERIES} 件まで選べます。「1 日平均」は、記録のある日だけで割った値です。`
-            : `グラフに出す対象は、チェックボックスで ${MAX_SERIES} 件まで選べます。ポイントはランキングと同じ計算です（アクションのポイント + 歩数の合計 1000 歩ごとに 1pt）。`
+            ? "グラフに出す対象は、チェックボックスでいくつでも選べます。「1 日平均」は、記録のある日だけで割った値です。"
+            : "グラフに出す対象は、チェックボックスでいくつでも選べます。ポイントはランキングと同じ計算です（アクションのポイント + 歩数の合計 1000 歩ごとに 1pt）。"
         }
       >
         <ScrollTable>
@@ -473,20 +500,15 @@ function PointsView({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        disabled={
-                          !isSelected && selectedKeys.length >= MAX_SERIES
-                        }
                         onChange={() => toggle(row.entity.key)}
                         aria-label={`${row.entity.name}をグラフに表示`}
                       />
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: isSelected
-                            ? SERIES_COLORS[selectedIndex]
-                            : "transparent",
-                        }}
-                      ></span>
+                      {/* 選んでいない行も同じ幅を空けて、名前の位置をそろえる */}
+                      <span className="inline-flex w-[22px] shrink-0">
+                        {isSelected && (
+                          <SeriesSwatch index={selectedIndex}></SeriesSwatch>
+                        )}
+                      </span>
                       <EntityName entity={row.entity}></EntityName>
                     </label>
                   </Td>
