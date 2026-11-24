@@ -47,7 +47,7 @@ export function LoginHome() {
     })
       .then((result) => {
         if (result?.error) {
-          toast.error("メールアドレスまたはパスワードが間違っています。");
+          toast.error("名前またはパスワードが間違っています。");
         } else {
           toast.success("ログインしました");
           router.push(REDIRECT_AFTER_LOGIN_PATH);
