@@ -25,13 +25,18 @@ import {
 } from "./charts";
 import { AnalyticsData, AnalyticsEventOption } from "./types";
 
-type View = "points" | "checks" | "counts" | "detail";
+type View = "points" | "steps" | "checks" | "counts" | "detail";
 
 const VIEWS: { id: View; label: string; description: string }[] = [
   {
     id: "points",
     label: "ポイントの推移",
     description: "日ごとに得たポイントと、指定した日までの合計",
+  },
+  {
+    id: "steps",
+    label: "歩数の推移",
+    description: "日ごとの歩数と、指定した日までの合計",
   },
   {
     id: "checks",
@@ -143,7 +148,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
 
       <div
         role="tablist"
-        className="grid grid-cols-2 md:grid-cols-4 gap-1 rounded-lg bg-slate-200 p-1"
+        className="grid grid-cols-2 md:grid-cols-5 gap-1 rounded-lg bg-slate-200 p-1"
       >
         {VIEWS.map((item) => (
           <button
@@ -166,10 +171,11 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
         {VIEWS.find((item) => item.id === view)?.description}
       </p>
 
-      {view === "points" && (
+      {(view === "points" || view === "steps") && (
         <PointsView
-          // 単位を切り替えたら、グラフに出す対象の選択をやり直す
-          key={unit}
+          // 単位や、ポイント・歩数を切り替えたら、グラフに出す対象の選択をやり直す
+          key={`${unit}-${view}`}
+          metric={view}
           data={data}
           unit={unit}
           entities={entities}
@@ -216,7 +222,7 @@ type ViewProps = {
 };
 
 // ---------------------------------------------------------------------------
-// ポイントの推移
+// ポイントの推移・歩数の推移（同じ形の表とグラフで、見る数字だけが違う）
 // ---------------------------------------------------------------------------
 function PointsView({
   data,
@@ -224,24 +230,40 @@ function PointsView({
   entities,
   cutoffIndex,
   visibleDays,
-}: ViewProps & { visibleDays: string[] }) {
+  metric,
+}: ViewProps & { visibleDays: string[]; metric: "points" | "steps" }) {
   const [mode, setMode] = useState<"cumulative" | "daily">("cumulative");
   const pointSeries = useMemo(() => buildPointSeries(data, unit), [data, unit]);
+
+  const isSteps = metric === "steps";
+  const metricName = isSteps ? "歩数" : "ポイント";
+  const unitLabel = isSteps ? "歩" : "pt";
 
   const rows = useMemo(
     () =>
       entities
         .map((entity) => {
           const series = pointSeries.get(entity.key)!;
+          const points = series.cumulative[cutoffIndex] ?? 0;
+          const steps = series.cumulativeSteps[cutoffIndex] ?? 0;
           return {
             entity,
-            series,
-            total: series.cumulative[cutoffIndex] ?? 0,
-            steps: series.cumulativeSteps[cutoffIndex] ?? 0,
+            // 表とグラフに出す、日ごとの値とその日までの合計
+            daily: isSteps ? series.steps : series.daily,
+            cumulative: isSteps ? series.cumulativeSteps : series.cumulative,
+            points,
+            steps,
+            // 並び順に使う、見ている数字の合計
+            total: isSteps ? steps : points,
+            // 記録のある日数（1 日あたりの平均に使う）
+            recordedDays: series.steps
+              .slice(0, cutoffIndex + 1)
+              .filter((value, index) => value > 0 || series.daily[index] > 0)
+              .length,
           };
         })
         .sort((a, b) => b.total - a.total),
-    [entities, pointSeries, cutoffIndex]
+    [entities, pointSeries, cutoffIndex, isSteps]
   );
 
   // グラフに出す対象。最初は合計の多い順に上限まで選ぶ
@@ -265,17 +287,19 @@ function PointsView({
     .map((row) => ({
       key: row.entity.key,
       name: row.entity.name,
-      values: (mode === "cumulative"
-        ? row.series.cumulative
-        : row.series.daily
-      ).slice(0, cutoffIndex + 1),
+      values: (mode === "cumulative" ? row.cumulative : row.daily).slice(
+        0,
+        cutoffIndex + 1
+      ),
     }));
 
   return (
     <>
       <Panel
         title={
-          mode === "cumulative" ? "その日までの合計ポイント" : "日ごとのポイント"
+          mode === "cumulative"
+            ? `その日までの${metricName}の合計`
+            : `日ごとの${metricName}`
         }
         action={
           <Segmented
@@ -291,19 +315,23 @@ function PointsView({
         <LineChart
           days={visibleDays}
           series={chartSeries}
-          unitLabel="pt"
+          unitLabel={unitLabel}
         ></LineChart>
       </Panel>
       <Panel
-        title="日ごとのポイント"
-        note={`グラフに出す対象は、チェックボックスで ${MAX_SERIES} 件まで選べます。ポイントはランキングと同じ計算です（アクションのポイント + 歩数の合計 1000 歩ごとに 1pt）。`}
+        title={`日ごとの${metricName}`}
+        note={
+          isSteps
+            ? `グラフに出す対象は、チェックボックスで ${MAX_SERIES} 件まで選べます。「1 日平均」は、記録のある日だけで割った値です。`
+            : `グラフに出す対象は、チェックボックスで ${MAX_SERIES} 件まで選べます。ポイントはランキングと同じ計算です（アクションのポイント + 歩数の合計 1000 歩ごとに 1pt）。`
+        }
       >
         <ScrollTable>
           <thead>
             <tr>
               <Th sticky>{unit === "user" ? "ユーザー" : "チーム"}</Th>
               <Th right>{data.days[cutoffIndex]} までの合計</Th>
-              <Th right>歩数の合計</Th>
+              <Th right>{isSteps ? "1 日平均" : "歩数の合計"}</Th>
               {visibleDays.map((day) => (
                 <Th key={day} right>
                   {formatDay(day)}
@@ -340,12 +368,21 @@ function PointsView({
                     </label>
                   </Td>
                   <Td right bold>
-                    {row.total.toLocaleString()}pt
+                    {row.total.toLocaleString()}
+                    {unitLabel}
                   </Td>
-                  <Td right>{row.steps.toLocaleString()}歩</Td>
+                  <Td right>
+                    {isSteps
+                      ? row.recordedDays === 0
+                        ? "–"
+                        : `${Math.round(
+                            row.steps / row.recordedDays
+                          ).toLocaleString()}歩`
+                      : `${row.steps.toLocaleString()}歩`}
+                  </Td>
                   {visibleDays.map((day, index) => (
-                    <Td key={day} right muted={row.series.daily[index] === 0}>
-                      {row.series.daily[index]}
+                    <Td key={day} right muted={row.daily[index] === 0}>
+                      {row.daily[index].toLocaleString()}
                     </Td>
                   ))}
                 </tr>
@@ -646,6 +683,7 @@ function DetailView({
   visibleDays,
 }: ViewProps & { visibleDays: string[] }) {
   const [selectedKey, setSelectedKey] = useState(entities[0]?.key ?? "");
+  const [chartMetric, setChartMetric] = useState<"points" | "steps">("points");
 
   // 対象の一覧が変わって選択中のものが無くなったら、先頭を選び直す
   useEffect(() => {
@@ -692,12 +730,29 @@ function DetailView({
           歩）
         </span>
       </div>
-      <Panel title={`${entity.name}の日ごとのポイント`}>
+      <Panel
+        title={`${entity.name}の日ごとの${
+          chartMetric === "steps" ? "歩数" : "ポイント"
+        }`}
+        action={
+          <Segmented
+            options={[
+              { value: "points", label: "ポイント" },
+              { value: "steps", label: "歩数" },
+            ]}
+            value={chartMetric}
+            onChange={(value) => setChartMetric(value as "points" | "steps")}
+          ></Segmented>
+        }
+      >
         <ColumnChart
           days={visibleDays}
-          values={series.daily.slice(0, cutoffIndex + 1)}
-          seriesName="その日のポイント"
-          unitLabel="pt"
+          values={(chartMetric === "steps" ? series.steps : series.daily).slice(
+            0,
+            cutoffIndex + 1
+          )}
+          seriesName={chartMetric === "steps" ? "その日の歩数" : "その日のポイント"}
+          unitLabel={chartMetric === "steps" ? "歩" : "pt"}
         ></ColumnChart>
       </Panel>
       <Panel
@@ -717,6 +772,7 @@ function DetailView({
               <Th right>歩数</Th>
               <Th right>その日のポイント</Th>
               <Th right>その日までの合計</Th>
+              <Th right>その日までの歩数</Th>
             </tr>
           </thead>
           <tbody>
@@ -758,6 +814,9 @@ function DetailView({
                     {series.daily[index]}pt
                   </Td>
                   <Td right>{series.cumulative[index].toLocaleString()}pt</Td>
+                  <Td right>
+                    {series.cumulativeSteps[index].toLocaleString()}歩
+                  </Td>
                 </tr>
               );
             })}
