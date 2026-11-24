@@ -83,7 +83,7 @@ export function AnalyticsHome({
         <h2 className="font-bold mr-auto">記録の分析</h2>
         <Field label="イベント">
           <Select
-            className="w-64"
+            className="w-96 max-w-full"
             value={data.event.id}
             onChange={(e) =>
               router.push(`/admin/analytics?event=${e.target.value}`)
