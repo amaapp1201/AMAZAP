@@ -23,7 +23,7 @@ import { REDIRECT_AFTER_LOGIN_PATH } from "../helpers/const";
 import { useRouter } from "next/navigation";
 
 const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(25),
+  name: z.string().trim().min(1),
   password: z.string().trim().min(1),
 });
 

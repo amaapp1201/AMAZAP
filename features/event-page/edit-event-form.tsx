@@ -21,7 +21,6 @@ import { useForm } from "react-hook-form";
 import { cn, formatToJst } from "../helpers/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../ui/button";
-import { RemainingChars } from "../ui/remaining-charts";
 
 import { z } from "@/features/helpers/ja-zod";
 import { addDays, differenceInDays, subSeconds } from "date-fns";
@@ -29,7 +28,7 @@ import { addDays, differenceInDays, subSeconds } from "date-fns";
 const PlannningEventSchema = z
   .object({
     id: z.number(),
-    eventName: z.string().trim().min(1).max(20),
+    eventName: z.string().trim().min(1),
     startAt: z.string().trim().datetime().nullable(),
     endAt: z.string().trim().datetime().nullable(),
     categoryIds: z.array(z.number()),
@@ -138,11 +137,6 @@ export function EditPlanningEventForm({
                 <FormControl>
                   <Input id="eventName" {...field} />
                 </FormControl>
-                <RemainingChars
-                  maxLength={20}
-                  name="eventName"
-                  control={form.control}
-                ></RemainingChars>
                 <FormMessage />
               </FormItem>
             )}
@@ -321,7 +315,7 @@ export function EditPlanningEventForm({
 const PublishedEventSchema = z
   .object({
     id: z.number(),
-    eventName: z.string().trim().min(1).max(20),
+    eventName: z.string().trim().min(1),
     startAt: z.string().trim().datetime().nullable(),
     endAt: z.string().trim().datetime().nullable(),
   })
@@ -427,11 +421,6 @@ export function EditPublishedEventForm({
                 <FormControl>
                   <Input id="eventName" {...field} />
                 </FormControl>
-                <RemainingChars
-                  maxLength={20}
-                  name="eventName"
-                  control={form.control}
-                ></RemainingChars>
                 <FormMessage />
               </FormItem>
             )}

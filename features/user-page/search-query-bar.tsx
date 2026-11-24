@@ -39,11 +39,15 @@ export function SearchQueryBar({
 
     const url = new URL(window.location.href);
     url.searchParams.set("searchTerm", encodedValue);
+    url.searchParams.delete("page");
     router.push(url.toString());
   }, []);
 
   const onResetClick = useCallback(() => {
-    router.push(pathname);
+    // アーカイブ一覧を見ているときは、その表示のまま検索だけを解除する
+    const isArchived =
+      new URL(window.location.href).searchParams.get("archived") === "1";
+    router.push(isArchived ? `${pathname}?archived=1` : pathname);
     form.reset();
   }, [pathname]);
 

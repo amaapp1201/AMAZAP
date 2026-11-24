@@ -6,6 +6,7 @@ import {
   UpdateRequestEventSchemaType,
 } from "./schema";
 import { Event, PublishedEvent } from "../daily-record-page/types";
+import { requireAdmin } from "../helpers/require-admin";
 
 const EVENT_SQL = `
 id,
@@ -26,7 +27,8 @@ event_categories (
       id,
       name,
       point,
-      order_id
+      order_id,
+      archived_at
     )
   )
 ),
@@ -69,6 +71,30 @@ event_teams (
 )
 ` as const;
 
+// 公開前のイベントは最新のアクションをそのまま表示するので、アーカイブ中のものを除く
+function omitArchivedActions<
+  T extends {
+    event_categories: {
+      action_categories: { actions: { archived_at: string | null }[] } | null;
+    }[];
+  }
+>(event: T): T {
+  return {
+    ...event,
+    event_categories: event.event_categories.map((eventCategory) => ({
+      ...eventCategory,
+      action_categories: eventCategory.action_categories
+        ? {
+            ...eventCategory.action_categories,
+            actions: eventCategory.action_categories.actions.filter(
+              (action) => !action.archived_at
+            ),
+          }
+        : null,
+    })),
+  };
+}
+
 export async function getSimpleEvent(eventId: number) {
   const supabase = await createClient();
 
@@ -103,7 +129,7 @@ export async function getEvent(eventId: number): Promise<Event | null> {
     throw error;
   }
 
-  return currentEvent;
+  return currentEvent ? omitArchivedActions(currentEvent) : null;
 }
 
 /**
@@ -170,7 +196,7 @@ export async function getPlanningEvents(): Promise<Event[]> {
     throw error;
   }
 
-  return currentEvent;
+  return currentEvent.map(omitArchivedActions);
 }
 
 export async function createEvent(args: CreateRequestEventSchemaType): Promise<{
@@ -522,4 +548,87 @@ export async function copyEvent(eventId: number) {
     categoryIds: event.event_categories.map((category) => category.category_id),
     teamIds: event.event_teams.map((team) => team.team_id),
   });
+}
+
+// 削除の確認画面に出すため、イベントに紐づく記録の件数を返す
+export async function getEventRecordCount(eventId: number) {
+  await requireAdmin();
+
+  const supabase = await createAdminClient({ schema: "public" });
+
+  const { count, error } = await supabase
+    .from("records")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId);
+
+  if (error) {
+    console.error("count error records", error);
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
+// イベントを、参加者の記録ごと削除する。
+// 外部キーで参照している側から順に消す。途中で失敗してもイベント自体は残るため、
+// もう一度実行すれば続きから削除できる
+export async function deleteEvent(
+  eventId: number
+): Promise<{ failure: string } | void> {
+  await requireAdmin();
+
+  const supabase = await createAdminClient({ schema: "public" });
+
+  const { data: records, error: recordsError } = await supabase
+    .from("records")
+    .select("id")
+    .eq("event_id", eventId);
+
+  if (recordsError) {
+    console.error("query error records", recordsError);
+    throw recordsError;
+  }
+
+  // 件数が多いと URL が長くなりすぎるので、分割して消す
+  const recordIds = records.map((record) => record.id);
+  const chunkSize = 200;
+  for (let i = 0; i < recordIds.length; i += chunkSize) {
+    const { error } = await supabase
+      .from("record_actions")
+      .delete()
+      .in("record_id", recordIds.slice(i, i + chunkSize));
+
+    if (error) {
+      console.error("delete error record_actions", error);
+      throw error;
+    }
+  }
+
+  // event_actions_snapshot は event_categories を、event_users_snapshot は event_teams を参照している
+  const tables = [
+    "records",
+    "event_users_snapshot",
+    "event_actions_snapshot",
+    "event_categories",
+    "event_teams",
+  ] as const;
+
+  for (const table of tables) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("event_id", eventId);
+
+    if (error) {
+      console.error(`delete error ${table}`, error);
+      throw error;
+    }
+  }
+
+  const { error } = await supabase.from("events").delete().eq("id", eventId);
+
+  if (error) {
+    console.error("delete error events", error);
+    throw error;
+  }
 }

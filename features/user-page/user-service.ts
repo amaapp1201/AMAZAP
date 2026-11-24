@@ -3,19 +3,7 @@
 import { createAdminClient, createClient } from "@/features/supabase/server";
 import { omitUndefinedCondition } from "../helpers/match-condition";
 import bcrypt from "bcrypt";
-import { auth } from "../helpers/auth";
-
-// このファイルの更新系の処理は RLS を通らないサーバー用の鍵を使うため、
-// 呼び出したユーザーが管理者であることをここで確認する
-async function requireAdmin() {
-  const session = await auth();
-
-  if (!session?.user?.isAdmin) {
-    throw new Error("管理者のみが実行できる操作です");
-  }
-
-  return session;
-}
+import { requireAdmin } from "../helpers/require-admin";
 
 // supabaseのauth userの作成とともに、usersテーブルにもデータを作成する
 export async function createUser({
@@ -50,7 +38,8 @@ export async function createUser({
 
   if (users.length > 0) {
     return {
-      failure: "同じ名前のユーザーがすでに存在します",
+      failure:
+        "同じ名前のユーザーがすでに存在します（アーカイブ中のユーザーも含みます）",
     };
   }
 
@@ -76,11 +65,14 @@ export async function getUsers({
   pageSize = 10,
   searchTerm,
   matchCondition,
+  archived = false,
 }: {
   page?: number;
   pageSize?: number;
   searchTerm?: string;
   matchCondition?: { team_id?: number | null };
+  // true ならアーカイブ中のユーザーだけ、false なら利用中のユーザーだけを返す
+  archived?: boolean;
 }) {
   const supabase = await createClient();
 
@@ -103,7 +95,12 @@ export async function getUsers({
       { count: "exact" }
     )
     .match(filteredMatchCondition)
+    .order("user_name")
     .range(from, to);
+
+  baseQuery = archived
+    ? baseQuery.not("archived_at", "is", null)
+    : baseQuery.is("archived_at", null);
 
   if (searchTerm) {
     baseQuery = baseQuery.or(
@@ -189,7 +186,8 @@ export async function getEventUsers({
     )
     .match({
       team_id: teamId,
-    });
+    })
+    .is("archived_at", null);
 
   if (error) {
     console.error("query error users", error);
@@ -220,7 +218,8 @@ export async function getTeamUsers(teamId: number) {
     )
     .match({
       team_id: teamId,
-    });
+    })
+    .is("archived_at", null);
 
   if (error) {
     console.error("query error users", error);
@@ -374,5 +373,47 @@ export async function deleteUser(
   if (userError) {
     console.error("delete error users", userError);
     throw userError;
+  }
+}
+
+// ユーザーをアーカイブする。ログインできなくなり一覧からも外れるが、記録は残る
+export async function archiveUser(
+  userId: string
+): Promise<{ failure: string } | void> {
+  const session = await requireAdmin();
+
+  if (session.user.id === userId) {
+    return { failure: "ログイン中の自分自身はアーカイブできません" };
+  }
+
+  const supabase = await createAdminClient({ schema: "next_auth" });
+
+  const { error } = await supabase
+    .from("users")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("archive error users", error);
+    throw error;
+  }
+}
+
+// アーカイブしたユーザーを元に戻す
+export async function restoreUser(
+  userId: string
+): Promise<{ failure: string } | void> {
+  await requireAdmin();
+
+  const supabase = await createAdminClient({ schema: "next_auth" });
+
+  const { error } = await supabase
+    .from("users")
+    .update({ archived_at: null })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("restore error users", error);
+    throw error;
   }
 }

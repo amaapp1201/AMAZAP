@@ -20,6 +20,10 @@ import {
 import { EditUserModal } from "./edit-user-modal";
 import { EditUserPasswordModal } from "./edit-user-password-modal";
 import { DeleteUserModal } from "./delete-user-modal";
+import { ArchiveIcon, ArchiveRestoreIcon } from "lucide-react";
+import { ConfirmActionButton } from "../ui/confirm-action-button";
+// アーカイブと復元は、この表でしか使わないのでサーバーの処理を直接呼ぶ
+import { archiveUser, restoreUser } from "./user-service";
 import { useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "../ui/button";
@@ -40,6 +44,7 @@ export function UserTable({
   deleteUser,
   getUserRecordCount,
   currentUserId,
+  isArchivedView = false,
   teams,
 }: {
   users: User[];
@@ -57,6 +62,8 @@ export function UserTable({
   deleteUser: (userId: string) => Promise<{ failure: string } | void>;
   getUserRecordCount: (userId: string) => Promise<number>;
   currentUserId: string;
+  // true のときはアーカイブ中のユーザーの一覧として表示する
+  isArchivedView?: boolean;
   teams: {
     id: number;
     name: string;
@@ -123,23 +130,51 @@ export function UserTable({
       header: "操作",
       cell: ({ row }) => (
         <div className="flex items-center space-x-2">
-          <EditUserModal
-            teams={teams}
-            updateUser={updateUser}
-            user={{
-              userId: row.original.user_id ?? "",
-              name: row.original.user_name ?? "",
-              teamId: row.original.team_id,
-              isAdmin: row.original.is_admin ?? false,
-            }}
-          ></EditUserModal>
-          <EditUserPasswordModal
-            user={{
-              userId: row.original.user_id ?? "",
-              name: row.original.user_name ?? "",
-            }}
-            updateUserPassword={updateUserPassword}
-          ></EditUserPasswordModal>
+          {isArchivedView ? (
+            <ConfirmActionButton
+              label="元に戻す"
+              icon={<ArchiveRestoreIcon className="h-4 w-4 mr-1" />}
+              title={`${row.original.user_name ?? ""}を元に戻しますか？`}
+              description="利用中の一覧に戻り、再びログインできるようになります。"
+              confirmLabel="元に戻す"
+              successMessage={`${row.original.user_name ?? ""}を元に戻しました`}
+              onConfirm={() => restoreUser(row.original.user_id ?? "")}
+            ></ConfirmActionButton>
+          ) : (
+            <>
+              <EditUserModal
+                teams={teams}
+                updateUser={updateUser}
+                user={{
+                  userId: row.original.user_id ?? "",
+                  name: row.original.user_name ?? "",
+                  teamId: row.original.team_id,
+                  isAdmin: row.original.is_admin ?? false,
+                }}
+              ></EditUserModal>
+              <EditUserPasswordModal
+                user={{
+                  userId: row.original.user_id ?? "",
+                  name: row.original.user_name ?? "",
+                }}
+                updateUserPassword={updateUserPassword}
+              ></EditUserPasswordModal>
+              <ConfirmActionButton
+                label="アーカイブ"
+                icon={<ArchiveIcon className="h-4 w-4 mr-1" />}
+                title={`${row.original.user_name ?? ""}をアーカイブしますか？`}
+                description="ログインできなくなり、一覧やこれから公開するイベントの参加者から外れます。これまでの記録は残り、いつでも元に戻せます。"
+                confirmLabel="アーカイブする"
+                successMessage={`${row.original.user_name ?? ""}をアーカイブしました`}
+                onConfirm={() => archiveUser(row.original.user_id ?? "")}
+                disabledReason={
+                  row.original.user_id === currentUserId
+                    ? "ログイン中の自分自身はアーカイブできません"
+                    : undefined
+                }
+              ></ConfirmActionButton>
+            </>
+          )}
           <DeleteUserModal
             user={{
               userId: row.original.user_id ?? "",

@@ -32,7 +32,9 @@ npm ci
 1. Supabase で新しいプロジェクトを作ります。
 2. SQL Editor に [`supabase/migrations/20261124000000_initial_schema.sql`](supabase/migrations/20261124000000_initial_schema.sql) の全文を貼り付けて、一度だけ実行します。
    - 「This query creates tables without enabling Row Level Security」という警告が出たら、「Run without RLS」を選びます。警告の対象は `next_auth` スキーマのテーブルで、こちらは RLS ではなく権限（サーバー用の鍵だけが読み書きできる）で保護しています。
-3. Project Settings → Data API → Settings の「Exposed schemas」に `next_auth` を追加して保存します。
+3. 続けて、`supabase/migrations/` にある残りの SQL ファイルを、ファイル名の日付が古い順に、同じように 1 つずつ実行します。
+   - [`20261125000000_add_archive.sql`](supabase/migrations/20261125000000_add_archive.sql): アーカイブ機能のための列を追加します。
+4. Project Settings → Data API → Settings の「Exposed schemas」に `next_auth` を追加して保存します。
 
 ### 3. 最初の管理者を作る
 
@@ -101,6 +103,18 @@ http://localhost:3000 を開き、手順 3 で作った管理者でログイン�
 - ログインすると、NextAuth のセッションの中に Supabase 用の JWT（`SUPABASE_JWT_SECRET` で署名）が作られます。サーバー側の処理はこの JWT を付けて Supabase を呼び、行レベルセキュリティが「管理者だけが登録できる」「本人の記録だけ更新できる」といった制御を行います。
 - ユーザー情報（`next_auth` スキーマ）の読み書きと、一部の集計は、サーバー用の鍵（`SUPABASE_SERVICE_ROLE`）で行います。
 - 未ログインの状態では、どのテーブルも読めません。
+
+## アーカイブと削除
+
+カテゴリ、アクション、ユーザー、チーム、イベントは、それぞれアーカイブと削除ができます。
+
+- **アーカイブ**: 一覧や選択肢から外しますが、データは残します。過去のイベントの記録や集計はそのまま読め、「元に戻す」でいつでも再び使えます。
+  - チームとカテゴリは、アーカイブすると計画中のイベントの対象からも外れます。
+  - ユーザーは、アーカイブするとログインできなくなります。
+  - イベントは、進行中のものをアーカイブでき、アーカイブ一覧の「再公開する」で進行中に戻せます。
+- **削除**: データを完全に消します。元には戻せません。
+  - ユーザーとイベントは、その記録ごと削除します。
+  - カテゴリ、アクション、チームは、公開済みのイベントで使われたものは削除できません（記録や集計が参照しているため）。使わなくなったものはアーカイブしてください。
 
 ## データベースを変更するとき
 

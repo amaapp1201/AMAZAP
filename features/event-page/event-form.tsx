@@ -24,7 +24,6 @@ import { useForm } from "react-hook-form";
 import { cn, formatToJst } from "../helpers/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../ui/button";
-import { RemainingChars } from "../ui/remaining-charts";
 
 export function EventForm({
   teams,
@@ -114,11 +113,6 @@ export function EventForm({
                 <FormControl>
                   <Input id="eventName" {...field} />
                 </FormControl>
-                <RemainingChars
-                  maxLength={20}
-                  name="eventName"
-                  control={form.control}
-                ></RemainingChars>
                 <FormMessage />
               </FormItem>
             )}

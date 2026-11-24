@@ -42,7 +42,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .eq("name", name)
           .single();
 
-        if (error || !user) {
+        // アーカイブ中のユーザーはログインさせない
+        if (error || !user || user.archived_at) {
           throw new Error("名前またはパスワードが正しくありません");
         }
 

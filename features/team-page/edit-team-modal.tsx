@@ -17,7 +17,7 @@ import { Button } from "../ui/button";
 import { TeamForm } from "./team-form";
 
 const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(25),
+  name: z.string().trim().min(1),
 });
 type LocalShcmeaType = z.infer<typeof LocalShcmea>;
 

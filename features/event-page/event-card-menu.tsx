@@ -21,6 +21,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useCallback } from "react";
+import { ConfirmActionButton } from "../ui/confirm-action-button";
+// 削除は、このメニューでしか使わないのでサーバーの処理を直接呼ぶ
+import { deleteEvent, getEventRecordCount } from "./event-service";
 
 export function EventCardMenu({
   event,
@@ -28,7 +31,7 @@ export function EventCardMenu({
   categories,
   updateEvent,
   copyEvent,
-  isDeletable = false,
+  isDeletable = true,
   isShowPreviewButton = false,
   isShowEditButton = true,
 }: {
@@ -106,9 +109,10 @@ export function EventCardMenu({
 
         {isDeletable && (
           <DropdownMenuItem asChild>
-            <Button variant="destructive" className="h-8 w-full">
-              <TrashIcon className="h-4 w-4 mr-1"></TrashIcon>削除する
-            </Button>
+            <DeleteEventButton
+              eventId={event.id}
+              eventName={event.name}
+            ></DeleteEventButton>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
@@ -144,5 +148,31 @@ function CopyEventButton({
       <CopyIcon className="h-4 w-4 mr-1"></CopyIcon>
       このイベントを複製する
     </Button>
+  );
+}
+
+function DeleteEventButton({
+  eventId,
+  eventName,
+}: {
+  eventId: number;
+  eventName: string;
+}) {
+  return (
+    <ConfirmActionButton
+      label="削除する"
+      variant="destructive"
+      icon={<TrashIcon className="h-4 w-4 mr-1" />}
+      title={`「${eventName}」を削除しますか？`}
+      loadDescription={async () => {
+        const recordCount = await getEventRecordCount(eventId);
+        return recordCount === 0
+          ? "このイベントには参加者の記録がありません。一度削除すると元に戻すことはできません。"
+          : `参加者の記録${recordCount}件とランキングも一緒に削除されます。一度削除すると元に戻すことはできません。`;
+      }}
+      confirmLabel="削除する"
+      successMessage={`「${eventName}」を削除しました`}
+      onConfirm={() => deleteEvent(eventId)}
+    ></ConfirmActionButton>
   );
 }

@@ -3,6 +3,7 @@ import { NewTeamModal } from "./new-team-modal";
 import { SearchQueryBar } from "../user-page/search-query-bar";
 import { TeamTable } from "./team-table";
 import { PaginationInfo } from "../ui/pagination-info";
+import { ArchiveTabs } from "../ui/archive-tabs";
 
 export function TeamHome({
   teams,
@@ -14,6 +15,7 @@ export function TeamHome({
   total,
   count,
   pageSize,
+  isArchivedView = false,
 }: {
   createNewTeam: (data: { name: string }) => Promise<void>;
   updateTeam: (data: { teamId: number; name: string }) => Promise<any>;
@@ -28,6 +30,7 @@ export function TeamHome({
   pageSize: number;
   searchTerm?: string;
   totalCount: number;
+  isArchivedView?: boolean;
 }) {
   return (
     <div className="flex flex-col space-y-2 p-4">
@@ -35,6 +38,10 @@ export function TeamHome({
         <h2 className="font-bold">チーム一覧</h2>
         <NewTeamModal createNewTeam={createNewTeam}></NewTeamModal>
       </div>
+      <ArchiveTabs
+        baseHref="/admin/teams"
+        isArchived={isArchivedView}
+      ></ArchiveTabs>
       <div className="grid grid-cols-[auto_max-content] gap-4 items-center">
         <SearchQueryBar
           defaultSearchTerm={searchTerm}
@@ -47,14 +54,22 @@ export function TeamHome({
         ></PaginationInfo>
       </div>
       {teams.length === 0 ? (
-        <div>チームが見つかりませんでした</div>
+        <div>
+          {isArchivedView
+            ? "アーカイブ中のチームはありません"
+            : "チームが見つかりませんでした"}
+        </div>
       ) : (
-        <TeamTable teams={teams} updateTeam={updateTeam}></TeamTable>
+        <TeamTable
+          teams={teams}
+          updateTeam={updateTeam}
+          isArchivedView={isArchivedView}
+        ></TeamTable>
       )}
       <SmartPagination
         currentPage={currentPage}
         totalPages={totalPages}
-        baseHref="/admin/teams"
+        baseHref={isArchivedView ? "/admin/teams?archived=1" : "/admin/teams"}
       ></SmartPagination>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   KanbanBoardProvider,
 } from "../ui/kanban/kanban-context";
 import { toast } from "sonner";
+import { ActionMenu, ArchiveListModal, CategoryMenu } from "./action-archive";
 
 export function ActionHome({
   categories,
@@ -27,12 +28,21 @@ export function ActionHome({
   updateCategoryOrders,
   updateActionOrders,
   createNewCategory,
+  archivedCategories,
+  archivedActions,
 }: {
   categories: {
     id: number;
     name: string;
     order_id: number;
     isSingleSelection: boolean;
+  }[];
+  archivedCategories: { id: number; name: string }[];
+  archivedActions: {
+    id: number;
+    name: string;
+    point: number;
+    categoryName: string;
   }[];
   actions: {
     category_id: number;
@@ -41,7 +51,6 @@ export function ActionHome({
     point: number;
     order_id: number;
   }[];
-  archiveAction: (action_id: number) => Promise<void>;
   createNewAction: (data: {
     name: string;
     point: number;
@@ -131,6 +140,8 @@ export function ActionHome({
           createNewAction={createNewAction}
           createNewCategory={createNewCategory}
           categories={categories}
+          archivedCategories={archivedCategories}
+          archivedActions={archivedActions}
         ></OperationArea>
         <KanbanBoard
           defaultCols={columns}
@@ -145,18 +156,24 @@ export function ActionHome({
             ></NewActionModal>
           )}
           renderEditTask={(renderProps) => (
-            <EditActionModal
-              categories={categories}
-              category_id={renderProps.columnId as number}
-              updateAction={updateAction}
-              action={actions.find((t) => renderProps.id === t.id)!}
-            ></EditActionModal>
+            <ActionMenu action={actions.find((t) => renderProps.id === t.id)!}>
+              <EditActionModal
+                categories={categories}
+                category_id={renderProps.columnId as number}
+                updateAction={updateAction}
+                action={actions.find((t) => renderProps.id === t.id)!}
+              ></EditActionModal>
+            </ActionMenu>
           )}
           renderEditColumn={(renderProps) => (
-            <EditCategoryModal
-              updateCategory={updateCategory}
+            <CategoryMenu
               category={categories.find((c) => renderProps.id === c.id)!}
-            ></EditCategoryModal>
+            >
+              <EditCategoryModal
+                updateCategory={updateCategory}
+                category={categories.find((c) => renderProps.id === c.id)!}
+              ></EditCategoryModal>
+            </CategoryMenu>
           )}
           updateTaskOrders={updateTaskOrders}
         />
@@ -172,7 +189,16 @@ function OperationArea({
   createNewCategory,
   // updateActionOrders,
   categories,
+  archivedCategories,
+  archivedActions,
 }: {
+  archivedCategories: { id: number; name: string }[];
+  archivedActions: {
+    id: number;
+    name: string;
+    point: number;
+    categoryName: string;
+  }[];
   // updatingTasks: {
   //   taskId: UniqueIdentifier;
   //   columnId: UniqueIdentifier;
@@ -197,7 +223,7 @@ function OperationArea({
   const { isDirty } = useContext(KanbanBoardContext);
 
   return (
-    <div className="flex space-x-3 max-w-screen-sm">
+    <div className="flex space-x-3 max-w-screen-md">
       <NewActionModal
         categories={categories}
         createNewAction={createNewAction}
@@ -207,6 +233,11 @@ function OperationArea({
         createNewCategory={createNewCategory}
         disabled={isDirty}
       ></NewCategoryModal>
+      <ArchiveListModal
+        archivedCategories={archivedCategories}
+        archivedActions={archivedActions}
+        disabled={isDirty}
+      ></ArchiveListModal>
       {/* {isDirty && (
         <ActionSaveButton
           onClick={onSaveClick}

@@ -3,6 +3,7 @@ import { SmartPagination } from "../ui/smart-pagination";
 import { SearchQueryBar } from "./search-query-bar";
 import { NewUserModal } from "./new-user-modal";
 import { PaginationInfo } from "../ui/pagination-info";
+import { ArchiveTabs } from "../ui/archive-tabs";
 
 export function UserHome({
   users,
@@ -12,6 +13,7 @@ export function UserHome({
   deleteUser,
   getUserRecordCount,
   currentUserId,
+  isArchivedView = false,
   createNewUser,
   currentPage,
   totalPages,
@@ -40,6 +42,7 @@ export function UserHome({
   deleteUser: (userId: string) => Promise<{ failure: string } | void>;
   getUserRecordCount: (userId: string) => Promise<number>;
   currentUserId: string;
+  isArchivedView?: boolean;
   createNewUser: (data: {
     teamId: number | null;
     name: string;
@@ -66,6 +69,10 @@ export function UserHome({
           createNewUser={createNewUser}
         ></NewUserModal>
       </div>
+      <ArchiveTabs
+        baseHref="/admin/users"
+        isArchived={isArchivedView}
+      ></ArchiveTabs>
       <div className="grid grid-cols-[auto_max-content] gap-4 items-center">
         <SearchQueryBar defaultSearchTerm={searchTerm}></SearchQueryBar>
         <PaginationInfo
@@ -75,7 +82,11 @@ export function UserHome({
         ></PaginationInfo>
       </div>
       {users.length === 0 ? (
-        <div>ユーザーが見つかりませんでした</div>
+        <div>
+          {isArchivedView
+            ? "アーカイブ中のユーザーはいません"
+            : "ユーザーが見つかりませんでした"}
+        </div>
       ) : (
         <UserTable
           users={users}
@@ -85,13 +96,14 @@ export function UserHome({
           deleteUser={deleteUser}
           getUserRecordCount={getUserRecordCount}
           currentUserId={currentUserId}
+          isArchivedView={isArchivedView}
         ></UserTable>
       )}
 
       <SmartPagination
         currentPage={currentPage}
         totalPages={totalPages}
-        baseHref="/admin/users"
+        baseHref={isArchivedView ? "/admin/users?archived=1" : "/admin/users"}
       ></SmartPagination>
     </div>
   );

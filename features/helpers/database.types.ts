@@ -99,6 +99,7 @@ export type Database = {
       }
       users: {
         Row: {
+          archived_at: string | null
           email: string | null
           emailVerified: string | null
           id: string
@@ -109,6 +110,7 @@ export type Database = {
           team_id: number | null
         }
         Insert: {
+          archived_at?: string | null
           email?: string | null
           emailVerified?: string | null
           id?: string
@@ -119,6 +121,7 @@ export type Database = {
           team_id?: number | null
         }
         Update: {
+          archived_at?: string | null
           email?: string | null
           emailVerified?: string | null
           id?: string
@@ -169,6 +172,7 @@ export type Database = {
     Tables: {
       action_categories: {
         Row: {
+          archived_at: string | null
           created_at: string
           id: number
           is_single_selection: boolean
@@ -176,6 +180,7 @@ export type Database = {
           order_id: number
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           id?: number
           is_single_selection?: boolean
@@ -183,6 +188,7 @@ export type Database = {
           order_id?: number
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           id?: number
           is_single_selection?: boolean
@@ -193,6 +199,7 @@ export type Database = {
       }
       actions: {
         Row: {
+          archived_at: string | null
           category_id: number
           created_at: string
           id: number
@@ -201,6 +208,7 @@ export type Database = {
           point: number
         }
         Insert: {
+          archived_at?: string | null
           category_id: number
           created_at?: string
           id?: number
@@ -209,6 +217,7 @@ export type Database = {
           point: number
         }
         Update: {
+          archived_at?: string | null
           category_id?: number
           created_at?: string
           id?: number
@@ -570,16 +579,19 @@ export type Database = {
       }
       teams: {
         Row: {
+          archived_at: string | null
           created_at: string
           id: number
           name: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           id?: number
           name: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           id?: number
           name?: string
@@ -626,6 +638,7 @@ export type Database = {
       }
       user_teams_view: {
         Row: {
+          archived_at: string | null
           is_admin: boolean | null
           team_id: number | null
           team_name: string | null
