@@ -87,6 +87,7 @@ http://localhost:3000 を開き、手順 3 で作った管理者でログイン�
 | `npm run lint` | ESLint を実行します |
 | `npm run storybook` | Storybook を起動します |
 | `npm run test` | Vitest を実行します |
+| `npm run test:unit` | 関数だけのテスト（入力期間の判定など）を実行します |
 
 ## フォルダ構成
 
