@@ -5,13 +5,56 @@ import { formatDay } from "./aggregate";
 
 // グラフの配色。系列の色は順番を固定し、対象が変わっても並び順で色が決まる。
 // 文字は系列の色を使わず、通常の文字色で書く
-export const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"];
+const SERIES_COLORS = [
+  "#2a78d6",
+  "#eb6834",
+  "#1baf7a",
+  "#eda100",
+  "#e87ba4",
+  "#008300",
+  "#6250d6",
+  "#e34948",
+];
+// 色を一巡したあとは、線の種類（実線 → 破線 → 点線 → 一点鎖線）を変えて見分けられるようにする
+const SERIES_DASHES = [undefined, "7 4", "2 4", "9 4 2 4"];
 const SINGLE_COLOR = "#2a78d6";
 const GRID_COLOR = "#e5e5e3";
 const AXIS_TEXT = "#6b6a66";
 
-// グラフに同時に出せる系列の上限
-export const MAX_SERIES = SERIES_COLORS.length;
+// 何も選び直していないときに、グラフへ出す件数
+export const DEFAULT_SERIES = 4;
+
+// 何番目に選ばれた系列かで、色と線の種類を決める。選べる数に上限はない
+export function seriesStyle(index: number): { color: string; dash?: string } {
+  return {
+    color: SERIES_COLORS[index % SERIES_COLORS.length],
+    dash: SERIES_DASHES[
+      Math.floor(index / SERIES_COLORS.length) % SERIES_DASHES.length
+    ],
+  };
+}
+
+// 凡例や表に置く、系列の線の見本
+export function SeriesSwatch({ index }: { index: number }) {
+  const style = seriesStyle(index);
+  return (
+    <svg width={22} height={10} className="shrink-0" aria-hidden>
+      <line
+        x1={1}
+        x2={21}
+        y1={5}
+        y2={5}
+        stroke={style.color}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeDasharray={style.dash}
+      />
+    </svg>
+  );
+}
+
+// マウスを乗せたときの一覧に出す件数の上限。超えた分は「ほか n 件」とまとめる
+const TOOLTIP_ROWS = 12;
 
 const WIDTH = 760;
 const HEIGHT = 260;
@@ -42,7 +85,13 @@ function labelEvery(count: number) {
   return Math.max(1, Math.ceil(count / 10));
 }
 
-function YAxis({ ticks, yOf }: { ticks: number[]; yOf: (v: number) => number }) {
+function YAxis({
+  ticks,
+  yOf,
+}: {
+  ticks: number[];
+  yOf: (v: number) => number;
+}) {
   return (
     <g>
       {ticks.map((tick) => (
@@ -87,7 +136,7 @@ function XAxis({ days, xOf }: { days: string[]; xOf: (i: number) => number }) {
           >
             {formatDay(day)}
           </text>
-        ) : null
+        ) : null,
       )}
     </g>
   );
@@ -133,7 +182,33 @@ function Tooltip({
   );
 }
 
-// 日ごとの推移を、対象ごとの折れ線で比べるグラフ（系列は MAX_SERIES 本まで）
+// マウスを乗せた日の値を、多い順に並べる。件数が多いときは上位だけを出す
+function tooltipRows(
+  series: { key: string; name: string; values: number[] }[],
+  dayIndex: number,
+  unitLabel: string,
+) {
+  const sorted = series
+    .map((s, index) => ({
+      color: seriesStyle(index).color,
+      label: s.name,
+      amount: s.values[dayIndex],
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  const rows: { color?: string; label: string; value: string }[] = sorted
+    .slice(0, TOOLTIP_ROWS)
+    .map((row) => ({
+      color: row.color,
+      label: row.label,
+      value: `${row.amount.toLocaleString()}${unitLabel}`,
+    }));
+  if (sorted.length > TOOLTIP_ROWS) {
+    rows.push({ label: `ほか ${sorted.length - TOOLTIP_ROWS} 件`, value: "" });
+  }
+  return rows;
+}
+
+// 日ごとの推移を、対象ごとの折れ線で比べるグラフ
 export function LineChart({
   days,
   series,
@@ -145,7 +220,7 @@ export function LineChart({
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const shown = series.slice(0, MAX_SERIES);
+  const shown = series;
   const max = Math.max(0, ...shown.flatMap((s) => s.values));
   const ticks = niceTicks(max);
   const top = ticks[ticks.length - 1];
@@ -171,10 +246,7 @@ export function LineChart({
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">
         {shown.map((s, index) => (
           <li key={s.key} className="flex items-center gap-1">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: SERIES_COLORS[index] }}
-            ></span>
+            <SeriesSwatch index={index}></SeriesSwatch>
             <span>{s.name}</span>
           </li>
         ))}
@@ -211,7 +283,8 @@ export function LineChart({
             <g key={s.key}>
               <polyline
                 fill="none"
-                stroke={SERIES_COLORS[seriesIndex]}
+                stroke={seriesStyle(seriesIndex).color}
+                strokeDasharray={seriesStyle(seriesIndex).dash}
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -219,19 +292,20 @@ export function LineChart({
                   .map((value, index) => `${xOf(index)},${yOf(value)}`)
                   .join(" ")}
               />
-              {/* 点は、日数が少ないときと、マウスを乗せた日だけ出す */}
+              {/* 点は、日数も系列も少ないときと、マウスを乗せた日だけ出す */}
               {s.values.map((value, index) =>
-                days.length <= 14 || index === hoverIndex ? (
+                (days.length <= 14 && shown.length <= 8) ||
+                index === hoverIndex ? (
                   <circle
                     key={index}
                     cx={xOf(index)}
                     cy={yOf(value)}
                     r={4}
-                    fill={SERIES_COLORS[seriesIndex]}
+                    fill={seriesStyle(seriesIndex).color}
                     stroke="#ffffff"
                     strokeWidth={2}
                   />
-                ) : null
+                ) : null,
               )}
             </g>
           ))}
@@ -240,11 +314,7 @@ export function LineChart({
           <Tooltip
             leftPercent={(xOf(hoverIndex) / WIDTH) * 100}
             title={days[hoverIndex]}
-            rows={shown.map((s, index) => ({
-              color: SERIES_COLORS[index],
-              label: s.name,
-              value: `${s.values[hoverIndex].toLocaleString()}${unitLabel}`,
-            }))}
+            rows={tooltipRows(shown, hoverIndex, unitLabel)}
           />
         )}
       </div>
@@ -304,7 +374,9 @@ export function ColumnChart({
                     x + barWidth
                   },${y + radius} V${baseline} Z`}
                   fill={SINGLE_COLOR}
-                  opacity={hoverIndex === null || hoverIndex === index ? 1 : 0.5}
+                  opacity={
+                    hoverIndex === null || hoverIndex === index ? 1 : 0.5
+                  }
                 />
               )}
               {/* 棒より広い範囲でマウスを受け取る */}
@@ -357,7 +429,9 @@ export function RankedBars({
 
   if (sorted.length === 0) {
     return (
-      <div className="text-sm text-muted-foreground">表示する項目がありません</div>
+      <div className="text-sm text-muted-foreground">
+        表示する項目がありません
+      </div>
     );
   }
 
