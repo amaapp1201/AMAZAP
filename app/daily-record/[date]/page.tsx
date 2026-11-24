@@ -2,12 +2,14 @@ import { DailyRecordHeader } from "@/features/daily-record-page/daily-record-hea
 import { DailyRecordHome } from "@/features/daily-record-page/daily-record-home";
 import { EventSwitcher } from "@/features/daily-record-page/event-switcher";
 import { getCurrentEvents } from "@/features/event-page/event-service";
+import { getMyEventPeriod } from "@/features/event-page/event-period-service";
 import {
   getTodayRecord,
   updateDailyRecord,
 } from "@/features/daily-record-page/daily-record-service";
 import { auth } from "@/features/helpers/auth";
 import { getTeam } from "@/features/team-page/team-service";
+import { isWihtinEventRange } from "@/features/daily-record-page/get-recordable-range";
 
 export default async function Page({
   params,
@@ -45,11 +47,39 @@ export default async function Page({
 
   const isoActualCurrentDate = new Date().toISOString();
 
+  // このユーザーだけの入力期間が設定されていれば、イベントの開催期間の代わりにそれを使う。
+  // 開始日・終了日とも入力できる日なので、開始日の 0 時から終了日の終わりまで（日本時間）とし、
+  // イベントの開催期間からはみ出す分は切り捨てる
+  const myPeriod = currentEvent
+    ? await getMyEventPeriod(currentEvent.id, session.user.id)
+    : null;
+  const later = (a: string | null, b: string) =>
+    a && new Date(a) > new Date(b) ? a : b;
+  const earlier = (a: string | null, b: string) =>
+    a && new Date(a) < new Date(b) ? a : b;
+  const recordableRange =
+    currentEvent && myPeriod
+      ? {
+          startAt: later(
+            currentEvent.startAt,
+            new Date(`${myPeriod.startDate}T00:00:00+09:00`).toISOString()
+          ),
+          endAt: earlier(
+            currentEvent.endAt,
+            new Date(`${myPeriod.endDate}T23:59:59+09:00`).toISOString()
+          ),
+        }
+      : {
+          startAt: currentEvent?.startAt ?? null,
+          endAt: currentEvent?.endAt ?? null,
+        };
+
   const header = (
     <DailyRecordHeader
       team={team}
       userProfile={session.user}
-      event={currentEvent}
+      event={currentEvent ? { ...currentEvent, ...recordableRange } : null}
+      isPersonalPeriod={!!myPeriod}
       isoCurrentDate={isoActualCurrentDate}
     ></DailyRecordHeader>
   );
@@ -77,6 +107,10 @@ export default async function Page({
     eventId: currentEvent.id,
     isoCurrentDate: isoCurrentDate,
     snapshot_team_id: teamId,
+    // 本人の入力期間の外の日は、表示するだけで空の記録を作らない
+    allowCreate:
+      !myPeriod ||
+      isWihtinEventRange(recordableRange, isoCurrentDate, "Asia/Tokyo"),
   });
 
   return (
@@ -101,8 +135,8 @@ export default async function Page({
         currentEvent={{
           id: currentEvent.id,
           name: currentEvent.name,
-          startAt: currentEvent.startAt,
-          endAt: currentEvent.endAt,
+          startAt: recordableRange.startAt,
+          endAt: recordableRange.endAt,
           isTeamRankVisible: currentEvent.is_team_rank_visible,
           isUserRankVisible: currentEvent.is_user_rank_visible,
           categories: currentEvent.event_categories.map((category) => ({

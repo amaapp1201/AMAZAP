@@ -929,6 +929,7 @@ function DetailView({
               <option key={e.key} value={e.key}>
                 {e.name}
                 {e.note ? `（${e.note}）` : ""}
+                {e.period ? ` 入力期間 ${e.period}` : ""}
               </option>
             ))}
           </Select>
@@ -1250,6 +1251,14 @@ function EntityName({ entity }: { entity: Entity }) {
       {entity.note && (
         <span className="text-xs text-muted-foreground ml-1">
           {entity.note}
+        </span>
+      )}
+      {entity.period && (
+        <span
+          className="ml-1 rounded border px-1 text-xs text-muted-foreground"
+          title="このユーザーに設定された入力期間"
+        >
+          入力期間 {entity.period}
         </span>
       )}
     </span>

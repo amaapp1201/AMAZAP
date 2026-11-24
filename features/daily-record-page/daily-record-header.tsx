@@ -4,13 +4,14 @@ import { formatToJst, nextDay } from "../helpers/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/features/ui/popover";
 import { InfoIcon } from "lucide-react";
 import { isWihtinEventRange } from "./get-recordable-range";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 
 export function DailyRecordHeader({
   team,
   userProfile,
   event,
   isoCurrentDate,
+  isPersonalPeriod = false,
 }: {
   team: { name: string } | null;
   userProfile: { name: string; isAdmin: boolean } | null;
@@ -23,7 +24,23 @@ export function DailyRecordHeader({
     is_user_rank_visible: boolean;
   } | null;
   isoCurrentDate: string;
+  // true のときは、event の期間がこのユーザーだけの入力期間であることを表示する
+  isPersonalPeriod?: boolean;
 }) {
+  const range = {
+    startAt: event?.startAt ?? null,
+    endAt: event?.endAt ?? null,
+  };
+  // いまが期間内か。期間外でも、昨日が期間内なら最終日の翌日（最終日の分をまだ入力できる日）
+  const isInRangeNow = isWihtinEventRange(range, isoCurrentDate, "Asia/Tokyo");
+  const isGraceDay =
+    !isInRangeNow &&
+    isWihtinEventRange(
+      range,
+      subDays(new Date(isoCurrentDate), 1).toISOString(),
+      "Asia/Tokyo",
+    );
+
   return (
     <header>
       <div className="flex justify-between p-4">
@@ -41,22 +58,27 @@ export function DailyRecordHeader({
             </span>
           )}
           <span className="text-2xl text-center font-bold">{event.name}</span>
-          {!isWihtinEventRange(
-            {
-              startAt: event.startAt,
-              endAt: event.endAt,
-            },
-            isoCurrentDate,
-            "Asia/Tokyo"
-          ) && (
+          {!isInRangeNow && (
             <span className="flex">
-              <span className="text-red-500">イベント期間外です</span>
+              {isGraceDay ? (
+                // 最終日の翌日。最終日の分だけは、まだ入力できる
+                <span className="text-red-500 text-center">
+                  {isPersonalPeriod ? "あなたの入力期間" : "イベント"}
+                  は終了しました。最終日の分は、今日まで入力できます
+                </span>
+              ) : (
+                <span className="text-red-500">
+                  {isPersonalPeriod
+                    ? "あなたの入力期間外です"
+                    : "イベント期間外です"}
+                </span>
+              )}
             </span>
           )}
 
           <div className="self-end flex flex-col items-end">
             <span>
-              集計期間:
+              {isPersonalPeriod ? "あなたの入力期間:" : "集計期間:"}
               {event.startAt
                 ? formatToJst(event.startAt, "MM/dd HH:mm")
                 : "???"}

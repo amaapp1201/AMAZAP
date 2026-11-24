@@ -12,11 +12,14 @@ export async function getTodayRecord({
   userId,
   isoCurrentDate,
   snapshot_team_id,
+  allowCreate = true,
 }: {
   eventId: number;
   userId: string;
   isoCurrentDate: string;
   snapshot_team_id: number;
+  // false のときは、その日の記録が無くても新しく作らない（本人の入力期間の外を表示するとき）
+  allowCreate?: boolean;
 }): Promise<{
   id: number;
   date: string;
@@ -105,11 +108,13 @@ export async function getTodayRecord({
 
   // 最新がなければイベントにはじめてアクセスしたことに。
   // その場合lastPointCumulativeとlastStepComlativeは0のままで。
-  const createNewRecord = !isBeforeYesterdayInLocal(
-    () => new Date().toISOString(),
-    isoCurrentDate,
-    "Asia/Tokyo"
-  );
+  const createNewRecord =
+    allowCreate &&
+    !isBeforeYesterdayInLocal(
+      () => new Date().toISOString(),
+      isoCurrentDate,
+      "Asia/Tokyo"
+    );
 
   if (!createNewRecord) {
     return {
@@ -180,6 +185,42 @@ export async function updateDailyRecord({
   activeaction_ids: ${activeaction_ids},
     `);
   const supabase = await createClient();
+
+  // ユーザーごとの入力期間が設定されていれば、その外の日の記録は更新させない。
+  // 画面側でも入力を止めているが、画面を通さない呼び出しに備えてここでも確認する。
+  // 期間は、引数ではなく記録そのものに書かれたイベントとユーザーで調べる
+  const { data: targetRecord, error: targetRecordError } = await supabase
+    .from("records")
+    .select("date, event_id, user_id")
+    .eq("id", recordId)
+    .maybeSingle();
+
+  if (targetRecordError) {
+    throw targetRecordError;
+  }
+
+  if (targetRecord) {
+    const { data: period, error: periodError } = await supabase
+      .from("event_user_periods")
+      .select("start_date, end_date")
+      .match({
+        event_id: targetRecord.event_id,
+        user_id: targetRecord.user_id,
+      })
+      .maybeSingle();
+
+    if (periodError) {
+      throw periodError;
+    }
+
+    const recordDay = targetRecord.date.slice(0, 10);
+    if (
+      period &&
+      (recordDay < period.start_date || recordDay > period.end_date)
+    ) {
+      throw new Error("入力期間外のため、記録を更新できません");
+    }
+  }
 
   // daily record の update
   const { error: updateDailyRecordError } = await supabase
