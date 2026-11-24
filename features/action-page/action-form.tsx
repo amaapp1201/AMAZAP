@@ -16,10 +16,9 @@ import {
 import { Select } from "../ui/select";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { RemainingChars } from "../ui/remaining-charts";
 
 export const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(20),
+  name: z.string().trim().min(1),
   point: z.coerce.number().min(0),
   category_id: z.coerce.number({ message: "カテゴリを選択してください" }),
 });
@@ -86,11 +85,6 @@ export function ActionForm({
                   placeholder="運動した, 本を読んだ, etc."
                 ></Input>
               </FormControl>
-              <RemainingChars
-                maxLength={20}
-                name="name"
-                control={form.control}
-              ></RemainingChars>
               <FormMessage />
             </FormItem>
           )}

@@ -14,10 +14,9 @@ import {
   FormMessage,
 } from "../ui/form";
 import { Input } from "../ui/input";
-import { RemainingChars } from "../ui/remaining-charts";
 
 const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(20),
+  name: z.string().trim().min(1),
 });
 export type LocalShcmeaType = z.infer<typeof LocalShcmea>;
 
@@ -59,11 +58,6 @@ export function TeamForm({
               <FormControl>
                 <Input {...field} placeholder="元気100倍チーム"></Input>
               </FormControl>
-              <RemainingChars
-                maxLength={20}
-                control={form.control}
-                name="name"
-              ></RemainingChars>
               <FormMessage />
             </FormItem>
           )}

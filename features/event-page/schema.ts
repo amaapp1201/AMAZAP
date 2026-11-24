@@ -3,7 +3,7 @@ import { z } from "@/features/helpers/ja-zod";
 
 export const CreateRequestEventSchema = z
   .object({
-    eventName: z.string().trim().min(1).max(20),
+    eventName: z.string().trim().min(1),
     startAt: z.string().trim().datetime().nullable(),
     endAt: z.string().trim().datetime().nullable(),
     categoryIds: z.array(z.number()),
@@ -31,7 +31,7 @@ export type CreateRequestEventSchemaType = z.infer<
 export const UpdateRequestEventSchema = z
   .object({
     id: z.number(),
-    eventName: z.string().trim().min(1).max(20).optional(),
+    eventName: z.string().trim().min(1).optional(),
     startAt: z.string().trim().datetime().nullable().optional(),
     endAt: z.string().trim().datetime().nullable().optional(),
     categoryIds: z.array(z.number()).optional(),

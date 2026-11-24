@@ -20,7 +20,7 @@ import { Checkbox } from "../ui/checkbox";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(25),
+  name: z.string().trim().min(1),
   teamId: z.preprocess((raw) => {
     if (raw === "NO_TEAM") {
       return null;

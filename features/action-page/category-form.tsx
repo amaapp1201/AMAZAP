@@ -14,11 +14,10 @@ import {
   FormMessage,
 } from "../ui/form";
 import { Input } from "../ui/input";
-import { RemainingChars } from "../ui/remaining-charts";
 import { Checkbox } from "../ui/checkbox";
 
 const LocalShcmea = z.object({
-  name: z.string().trim().min(1).max(20),
+  name: z.string().trim().min(1),
   isSingleSelection: z.boolean(),
 });
 export type LocalShcmeaType = z.infer<typeof LocalShcmea>;
@@ -64,11 +63,6 @@ export function CategoryForm({
               <FormControl>
                 <Input {...field} placeholder="運動, 栄養, etc."></Input>
               </FormControl>
-              <RemainingChars
-                maxLength={20}
-                control={form.control}
-                name="name"
-              ></RemainingChars>
               <FormMessage />
             </FormItem>
           )}

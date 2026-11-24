@@ -13,9 +13,11 @@ export default async function Page({
   searchParams: Promise<{
     page?: string; // nextjsではstring型で渡される
     searchTerm?: string;
+    archived?: string; // "1" のときアーカイブ中の一覧を表示する
   }>;
 }) {
-  const { page, searchTerm } = await searchParams;
+  const { page, searchTerm, archived } = await searchParams;
+  const isArchivedView = archived === "1";
   const currentPage = page ? Number(page) : 1;
 
   const decodedSearchTerm = searchTerm
@@ -26,6 +28,7 @@ export default async function Page({
     page: currentPage,
     pageSize: pageSize,
     searchTerm: decodedSearchTerm,
+    archived: isArchivedView,
   });
 
   const totalPages = Math.ceil(count / pageSize);
@@ -41,6 +44,7 @@ export default async function Page({
       pageSize={pageSize}
       total={count}
       count={teams.length}
+      isArchivedView={isArchivedView}
     ></TeamHome>
   );
 }
