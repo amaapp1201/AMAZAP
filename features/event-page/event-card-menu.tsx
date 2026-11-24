@@ -24,6 +24,7 @@ import { useCallback } from "react";
 import { ConfirmActionButton } from "../ui/confirm-action-button";
 // 削除は、このメニューでしか使わないのでサーバーの処理を直接呼ぶ
 import { deleteEvent, getEventRecordCount } from "./event-service";
+import { EventPeriodDialog } from "./event-period-dialog";
 
 export function EventCardMenu({
   event,
@@ -107,6 +108,12 @@ export function EventCardMenu({
           </DropdownMenuItem>
         )}
 
+        <DropdownMenuItem asChild>
+          <EventPeriodDialog
+            eventId={event.id}
+            eventName={event.name}
+          ></EventPeriodDialog>
+        </DropdownMenuItem>
         {isDeletable && (
           <DropdownMenuItem asChild>
             <DeleteEventButton

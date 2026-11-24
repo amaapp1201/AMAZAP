@@ -9,6 +9,8 @@ export type Entity = {
   name: string;
   // ユーザーの場合の所属チーム名
   note?: string;
+  // ユーザーごとの入力期間が設定されている場合の表示（例: 10/1〜12/31）
+  period?: string;
 };
 
 // アクション別・カテゴリ別の集計で、何を数えるか
@@ -29,6 +31,9 @@ export function listEntities(data: AnalyticsData, unit: Unit): Entity[] {
     key: user.id,
     name: user.name,
     note: user.teamId ? teamNames.get(user.teamId) : undefined,
+    period: user.period
+      ? `${formatDay(user.period.startDate)}〜${formatDay(user.period.endDate)}`
+      : undefined,
   }));
 }
 

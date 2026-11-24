@@ -179,6 +179,24 @@ export async function getAnalyticsData(
     }
   }
 
+  // ユーザーごとの入力期間
+  const { data: periods, error: periodsError } = await supabase
+    .from("event_user_periods")
+    .select("user_id, start_date, end_date")
+    .eq("event_id", eventId);
+
+  if (periodsError) {
+    console.error("query error event_user_periods", periodsError);
+    throw periodsError;
+  }
+
+  const periodByUser = new Map(
+    periods.map((period) => [
+      period.user_id,
+      { startDate: period.start_date, endDate: period.end_date },
+    ])
+  );
+
   // 日付の範囲: 開始日から、終了日と今日の早いほうまで。範囲外の記録があればそこまで広げる
   const today = toJstDay(new Date().toISOString());
   const recordDays = records.map((record) => record.day).sort();
@@ -211,7 +229,9 @@ export async function getAnalyticsData(
         name: team.name_snapshot ?? "名称不明",
       }))
       .sort((a, b) => a.id - b.id),
-    users: [...users.values()].sort((a, b) => a.name.localeCompare(b.name, "ja")),
+    users: [...users.values()]
+      .map((user) => ({ ...user, period: periodByUser.get(user.id) ?? null }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ja")),
     categories: event.event_categories
       .map((category) => ({
         id: category.category_id,

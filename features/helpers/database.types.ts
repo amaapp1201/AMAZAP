@@ -393,6 +393,38 @@ export type Database = {
           },
         ]
       }
+      event_user_periods: {
+        Row: {
+          created_at: string
+          end_date: string
+          event_id: number
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          event_id: number
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          event_id?: number
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_user_periods_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_users_snapshot: {
         Row: {
           created_at: string

@@ -11,6 +11,7 @@ export function DailyRecordHeader({
   userProfile,
   event,
   isoCurrentDate,
+  isPersonalPeriod = false,
 }: {
   team: { name: string } | null;
   userProfile: { name: string; isAdmin: boolean } | null;
@@ -23,6 +24,8 @@ export function DailyRecordHeader({
     is_user_rank_visible: boolean;
   } | null;
   isoCurrentDate: string;
+  // true のときは、event の期間がこのユーザーだけの入力期間であることを表示する
+  isPersonalPeriod?: boolean;
 }) {
   return (
     <header>
@@ -50,13 +53,17 @@ export function DailyRecordHeader({
             "Asia/Tokyo"
           ) && (
             <span className="flex">
-              <span className="text-red-500">イベント期間外です</span>
+              <span className="text-red-500">
+                {isPersonalPeriod
+                  ? "あなたの入力期間外です"
+                  : "イベント期間外です"}
+              </span>
             </span>
           )}
 
           <div className="self-end flex flex-col items-end">
             <span>
-              集計期間:
+              {isPersonalPeriod ? "あなたの入力期間:" : "集計期間:"}
               {event.startAt
                 ? formatToJst(event.startAt, "MM/dd HH:mm")
                 : "???"}
