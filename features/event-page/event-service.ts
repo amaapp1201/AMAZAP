@@ -133,25 +133,27 @@ export async function getEvent(eventId: number): Promise<Event | null> {
 }
 
 /**
- * 現在進行中のイベント、イベントカテゴリ、アクション
+ * 現在進行中のイベントをすべて返す（複数を同時に進行できる）。
+ * 開始日の早い順。開始日が同じなら作成順
  */
-export async function getCurrentEvent(): Promise<PublishedEvent | null> {
+export async function getCurrentEvents(): Promise<PublishedEvent[]> {
   const supabase = await createClient();
 
-  const { error, data: currentEvent } = await supabase
+  const { error, data: currentEvents } = await supabase
     .from("events")
     .select(PUBLISHED_EVENT_SQL)
     .match({
       status: "active",
     })
-    .maybeSingle();
+    .order("startAt", { ascending: true, nullsFirst: false })
+    .order("id", { ascending: true });
 
   if (error) {
     console.error("query error event", error);
     throw error;
   }
 
-  return currentEvent;
+  return currentEvents;
 }
 
 export async function getPastEvents(
@@ -398,24 +400,6 @@ export async function publishEvent(eventId: number) {
   const supabase = await createAdminClient({
     schema: "public",
   });
-
-  // 現在公開中のイベントがあればエラー
-  const { data: currentEvent, error: currentEventError } = await supabase
-    .from("events")
-    .select("id")
-    .match({
-      status: "active",
-    })
-    .maybeSingle();
-
-  if (currentEventError) {
-    console.error("query error event", currentEventError);
-    throw currentEventError;
-  }
-
-  if (currentEvent) {
-    throw new Error("既に公開中のイベントがあります");
-  }
 
   const { error: eventStatusUpdateError } = await supabase
     .from("events")

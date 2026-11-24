@@ -2,7 +2,7 @@
 import { DatePicker } from "@/features/ui/date-picker";
 import { Button } from "../ui/button";
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toURLDate } from "@/features/helpers/utils";
 import { subDays } from "date-fns";
 import { enableActionAtom } from "./daily-record-state";
@@ -23,9 +23,18 @@ export function DateSelector({
   const router = useRouter();
   const canActoin = useAtomValue(enableActionAtom);
 
-  const changeDate = useCallback((date: string) => {
-    router.push("/daily-record/" + toURLDate(date));
-  }, []);
+  // 複数のイベントに参加しているときは、日付を変えても同じイベントを表示し続ける
+  const eventParam = useSearchParams().get("event");
+
+  const changeDate = useCallback(
+    (date: string) => {
+      const query = eventParam
+        ? `?event=${encodeURIComponent(eventParam)}`
+        : "";
+      router.push("/daily-record/" + toURLDate(date) + query);
+    },
+    [eventParam, router]
+  );
 
   return (
     <div>
