@@ -15,7 +15,8 @@ export const MAX_SERIES = SERIES_COLORS.length;
 
 const WIDTH = 760;
 const HEIGHT = 260;
-const MARGIN = { top: 16, right: 16, bottom: 28, left: 44 };
+// 左は、歩数の合計のような 6〜7 桁の目盛りが収まる幅にする
+const MARGIN = { top: 16, right: 16, bottom: 28, left: 64 };
 const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 
