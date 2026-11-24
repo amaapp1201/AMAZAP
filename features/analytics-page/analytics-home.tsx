@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { cn } from "@/features/helpers/utils";
 import { Select } from "../ui/select";
 import {
@@ -108,11 +109,18 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
   const [view, setView] = useState<View>("points");
   const [unit, setUnit] = useState<Unit>("user");
   const [cutoffIndex, setCutoffIndex] = useState(data.days.length - 1);
+  // 表の並び順。タブや単位を切り替えても同じ並びのままにする
+  const [sort, setSort] = useState<SortState>({ key: "total", desc: true });
+  // グラフに出す対象の選択。ユーザー単位とチーム単位で別々に覚えておき、
+  // ポイントと歩数のタブを行き来しても同じ選択のままにする。null はまだ選び直していない状態
+  const [selectedByUnit, setSelectedByUnit] = useState<
+    Record<Unit, string[] | null>
+  >({ user: null, team: null });
 
   const entities = useMemo(() => listEntities(data, unit), [data, unit]);
   const visibleDays = useMemo(
     () => data.days.slice(0, cutoffIndex + 1),
-    [data.days, cutoffIndex]
+    [data.days, cutoffIndex],
   );
 
   return (
@@ -160,7 +168,7 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
             onClick={() => setView(item.id)}
             className={cn(
               "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground",
-              view === item.id && "bg-background text-foreground shadow"
+              view === item.id && "bg-background text-foreground shadow",
             )}
           >
             {item.label}
@@ -173,14 +181,18 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
 
       {(view === "points" || view === "steps") && (
         <PointsView
-          // 単位や、ポイント・歩数を切り替えたら、グラフに出す対象の選択をやり直す
-          key={`${unit}-${view}`}
           metric={view}
           data={data}
           unit={unit}
           entities={entities}
           cutoffIndex={cutoffIndex}
           visibleDays={visibleDays}
+          sort={sort}
+          onSort={setSort}
+          selectedKeys={selectedByUnit[unit]}
+          onSelectedKeysChange={(keys) =>
+            setSelectedByUnit((current) => ({ ...current, [unit]: keys }))
+          }
         ></PointsView>
       )}
       {view === "checks" && (
@@ -190,6 +202,8 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
           entities={entities}
           cutoffIndex={cutoffIndex}
           visibleDays={visibleDays}
+          sort={sort}
+          onSort={setSort}
         ></ChecksView>
       )}
       {view === "counts" && (
@@ -198,6 +212,8 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
           unit={unit}
           entities={entities}
           cutoffIndex={cutoffIndex}
+          sort={sort}
+          onSort={setSort}
         ></CountsView>
       )}
       {view === "detail" && (
@@ -212,6 +228,46 @@ function AnalyticsBody({ data }: { data: AnalyticsData }) {
       )}
     </>
   );
+}
+
+// 表の並び順。key は "total"（合計）、"name"（名前）、"team"（ユーザー単位のときの所属チーム）のほか、
+// "second"（歩数の合計や 1 日平均）、"day:3"（日付の列）、"action:5"（アクションの列）のような列の名前
+type SortState = { key: string; desc: boolean };
+
+type SortProps = {
+  sort: SortState;
+  onSort: (sort: SortState) => void;
+};
+
+// 表の行を並べ替える。同じ値のものは名前順にして、押すたびに並びが揺れないようにする
+function sortRows<
+  T extends {
+    entity: Entity;
+    total: number;
+    // 合計以外の、数字で並べ替えられる列の値
+    sortValue?: (key: string) => number | undefined;
+  },
+>(rows: T[], sort: SortState, unit: Unit): T[] {
+  const byName = (a: T, b: T) =>
+    a.entity.name.localeCompare(b.entity.name, "ja");
+  // チーム単位では「チーム」と「名前」は同じ意味になる
+  const key = unit === "team" && sort.key === "team" ? "name" : sort.key;
+  const direction = sort.desc ? -1 : 1;
+
+  return [...rows].sort((a, b) => {
+    let result = 0;
+    if (key === "team") {
+      result = (a.entity.note ?? "").localeCompare(b.entity.note ?? "", "ja");
+    } else if (key === "name") {
+      result = byName(a, b);
+    } else {
+      // その表に無い列が指定されているとき（別のタブで選んだ列など）は、合計で並べる
+      const valueOf = (row: T) =>
+        key === "total" ? row.total : (row.sortValue?.(key) ?? row.total);
+      result = valueOf(a) - valueOf(b);
+    }
+    return result !== 0 ? result * direction : byName(a, b);
+  });
 }
 
 type ViewProps = {
@@ -231,7 +287,17 @@ function PointsView({
   cutoffIndex,
   visibleDays,
   metric,
-}: ViewProps & { visibleDays: string[]; metric: "points" | "steps" }) {
+  sort,
+  onSort,
+  selectedKeys: storedSelectedKeys,
+  onSelectedKeysChange,
+}: ViewProps &
+  SortProps & {
+    visibleDays: string[];
+    metric: "points" | "steps";
+    selectedKeys: string[] | null;
+    onSelectedKeysChange: (keys: string[]) => void;
+  }) {
   const [mode, setMode] = useState<"cumulative" | "daily">("cumulative");
   const pointSeries = useMemo(() => buildPointSeries(data, unit), [data, unit]);
 
@@ -241,43 +307,74 @@ function PointsView({
 
   const rows = useMemo(
     () =>
-      entities
-        .map((entity) => {
-          const series = pointSeries.get(entity.key)!;
-          const points = series.cumulative[cutoffIndex] ?? 0;
-          const steps = series.cumulativeSteps[cutoffIndex] ?? 0;
-          return {
-            entity,
-            // 表とグラフに出す、日ごとの値とその日までの合計
-            daily: isSteps ? series.steps : series.daily,
-            cumulative: isSteps ? series.cumulativeSteps : series.cumulative,
-            points,
-            steps,
-            // 並び順に使う、見ている数字の合計
-            total: isSteps ? steps : points,
-            // 記録のある日数（1 日あたりの平均に使う）
-            recordedDays: series.steps
-              .slice(0, cutoffIndex + 1)
-              .filter((value, index) => value > 0 || series.daily[index] > 0)
-              .length,
-          };
-        })
-        .sort((a, b) => b.total - a.total),
-    [entities, pointSeries, cutoffIndex, isSteps]
+      sortRows(
+        entities
+          .map((entity) => {
+            const series = pointSeries.get(entity.key)!;
+            const points = series.cumulative[cutoffIndex] ?? 0;
+            const steps = series.cumulativeSteps[cutoffIndex] ?? 0;
+            return {
+              entity,
+              // 表とグラフに出す、日ごとの値とその日までの合計
+              daily: isSteps ? series.steps : series.daily,
+              cumulative: isSteps ? series.cumulativeSteps : series.cumulative,
+              points,
+              steps,
+              // 並び順に使う、見ている数字の合計
+              total: isSteps ? steps : points,
+              // 記録のある日数（1 日あたりの平均に使う）
+              recordedDays: series.steps
+                .slice(0, cutoffIndex + 1)
+                .filter((value, index) => value > 0 || series.daily[index] > 0)
+                .length,
+            };
+          })
+          .map((row) => ({
+            ...row,
+            sortValue: (key: string) => {
+              if (key === "second") {
+                // ポイントのタブでは歩数の合計、歩数のタブでは 1 日平均
+                return isSteps
+                  ? row.recordedDays === 0
+                    ? 0
+                    : row.steps / row.recordedDays
+                  : row.steps;
+              }
+              if (key.startsWith("day:")) {
+                return row.daily[Number(key.slice(4))];
+              }
+              return undefined;
+            },
+          })),
+        sort,
+        unit,
+      ),
+    [entities, pointSeries, cutoffIndex, isSteps, sort, unit],
   );
 
-  // グラフに出す対象。最初は合計の多い順に上限まで選ぶ
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(() =>
-    rows.slice(0, MAX_SERIES).map((row) => row.entity.key)
+  // まだ選び直していないときにグラフへ出す対象。ポイントの合計が多い順に上限まで。
+  // 歩数のタブでも同じ顔ぶれになるよう、ここは常にポイントで決める
+  const defaultKeys = useMemo(
+    () =>
+      entities
+        .map((entity) => ({
+          key: entity.key,
+          points: pointSeries.get(entity.key)?.cumulative[cutoffIndex] ?? 0,
+        }))
+        .sort((a, b) => b.points - a.points)
+        .slice(0, MAX_SERIES)
+        .map((item) => item.key),
+    [entities, pointSeries, cutoffIndex],
   );
+  const selectedKeys = storedSelectedKeys ?? defaultKeys;
 
   const toggle = (key: string) => {
-    setSelectedKeys((current) =>
-      current.includes(key)
-        ? current.filter((k) => k !== key)
-        : current.length >= MAX_SERIES
-        ? current
-        : [...current, key]
+    onSelectedKeysChange(
+      selectedKeys.includes(key)
+        ? selectedKeys.filter((k) => k !== key)
+        : selectedKeys.length >= MAX_SERIES
+          ? selectedKeys
+          : [...selectedKeys, key],
     );
   };
 
@@ -289,7 +386,7 @@ function PointsView({
       name: row.entity.name,
       values: (mode === "cumulative" ? row.cumulative : row.daily).slice(
         0,
-        cutoffIndex + 1
+        cutoffIndex + 1,
       ),
     }));
 
@@ -329,12 +426,38 @@ function PointsView({
         <ScrollTable>
           <thead>
             <tr>
-              <Th sticky>{unit === "user" ? "ユーザー" : "チーム"}</Th>
-              <Th right>{data.days[cutoffIndex]} までの合計</Th>
-              <Th right>{isSteps ? "1 日平均" : "歩数の合計"}</Th>
-              {visibleDays.map((day) => (
+              <Th sticky>
+                <EntitySortButtons
+                  unit={unit}
+                  sort={sort}
+                  onSort={onSort}
+                ></EntitySortButtons>
+              </Th>
+              <Th right>
+                <SortButton
+                  label={`${data.days[cutoffIndex]} までの合計`}
+                  sortKey="total"
+                  sort={sort}
+                  onSort={onSort}
+                ></SortButton>
+              </Th>
+              <Th right>
+                <SortButton
+                  label={isSteps ? "1 日平均" : "歩数の合計"}
+                  sortKey="second"
+                  sort={sort}
+                  onSort={onSort}
+                ></SortButton>
+              </Th>
+              {visibleDays.map((day, index) => (
                 <Th key={day} right>
-                  {formatDay(day)}
+                  <SortButton
+                    label={formatDay(day)}
+                    sortKey={`day:${index}`}
+                    sort={sort}
+                    onSort={onSort}
+                    compact
+                  ></SortButton>
                 </Th>
               ))}
             </tr>
@@ -376,7 +499,7 @@ function PointsView({
                       ? row.recordedDays === 0
                         ? "–"
                         : `${Math.round(
-                            row.steps / row.recordedDays
+                            row.steps / row.recordedDays,
                           ).toLocaleString()}歩`
                       : `${row.steps.toLocaleString()}歩`}
                   </Td>
@@ -405,14 +528,16 @@ function ChecksView({
   entities,
   cutoffIndex,
   visibleDays,
-}: ViewProps & { visibleDays: string[] }) {
+  sort,
+  onSort,
+}: ViewProps & SortProps & { visibleDays: string[] }) {
   // "category:1" や "action:3" の形で、数える対象を持つ
   const [targetValue, setTargetValue] = useState(() =>
     data.categories[0]
       ? `category:${data.categories[0].id}`
       : data.actions[0]
-      ? `action:${data.actions[0].id}`
-      : ""
+        ? `action:${data.actions[0].id}`
+        : "",
   );
 
   const target = useMemo<CheckTarget | null>(() => {
@@ -433,22 +558,32 @@ function ChecksView({
 
   const checkSeries = useMemo(
     () => (target ? buildCheckSeries(data, unit, target) : new Map()),
-    [data, unit, target]
+    [data, unit, target],
   );
 
   const rows = useMemo(
     () =>
-      entities
-        .map((entity) => {
+      sortRows(
+        entities.map((entity) => {
           const values: number[] = checkSeries.get(entity.key) ?? [];
-          return { entity, values, total: sum(values, cutoffIndex) };
-        })
-        .sort((a, b) => b.total - a.total),
-    [entities, checkSeries, cutoffIndex]
+          return {
+            entity,
+            values,
+            total: sum(values, cutoffIndex),
+            sortValue: (key: string) =>
+              key.startsWith("day:")
+                ? (values[Number(key.slice(4))] ?? 0)
+                : undefined,
+          };
+        }),
+        sort,
+        unit,
+      ),
+    [entities, checkSeries, cutoffIndex, sort, unit],
   );
 
   const dailyTotals = visibleDays.map((_, index) =>
-    rows.reduce((total, row) => total + (row.values[index] ?? 0), 0)
+    rows.reduce((total, row) => total + (row.values[index] ?? 0), 0),
   );
   const checkedEntityCount = rows.filter((row) => row.total > 0).length;
 
@@ -515,11 +650,30 @@ function ChecksView({
         <ScrollTable>
           <thead>
             <tr>
-              <Th sticky>{unit === "user" ? "ユーザー" : "チーム"}</Th>
-              <Th right>{data.days[cutoffIndex]} までの合計</Th>
-              {visibleDays.map((day) => (
+              <Th sticky>
+                <EntitySortButtons
+                  unit={unit}
+                  sort={sort}
+                  onSort={onSort}
+                ></EntitySortButtons>
+              </Th>
+              <Th right>
+                <SortButton
+                  label={`${data.days[cutoffIndex]} までの合計`}
+                  sortKey="total"
+                  sort={sort}
+                  onSort={onSort}
+                ></SortButton>
+              </Th>
+              {visibleDays.map((day, index) => (
                 <Th key={day} right>
-                  {formatDay(day)}
+                  <SortButton
+                    label={formatDay(day)}
+                    sortKey={`day:${index}`}
+                    sort={sort}
+                    onSort={onSort}
+                    compact
+                  ></SortButton>
                 </Th>
               ))}
             </tr>
@@ -554,25 +708,42 @@ function ChecksView({
 // ---------------------------------------------------------------------------
 // チェック回数（対象 × アクション）
 // ---------------------------------------------------------------------------
-function CountsView({ data, unit, entities, cutoffIndex }: ViewProps) {
+function CountsView({
+  data,
+  unit,
+  entities,
+  cutoffIndex,
+  sort,
+  onSort,
+}: ViewProps & SortProps) {
   const counts = useMemo(
     () => buildActionCounts(data, unit, cutoffIndex),
-    [data, unit, cutoffIndex]
+    [data, unit, cutoffIndex],
   );
 
   const rows = useMemo(
     () =>
-      entities
-        .map((entity) => {
+      sortRows(
+        entities.map((entity) => {
           const byAction = counts.get(entity.key) ?? new Map<number, number>();
           let total = 0;
           for (const value of byAction.values()) {
             total += value;
           }
-          return { entity, byAction, total };
-        })
-        .sort((a, b) => b.total - a.total),
-    [entities, counts]
+          return {
+            entity,
+            byAction,
+            total,
+            sortValue: (key: string) =>
+              key.startsWith("action:")
+                ? (byAction.get(Number(key.slice(7))) ?? 0)
+                : undefined,
+          };
+        }),
+        sort,
+        unit,
+      ),
+    [entities, counts, sort, unit],
   );
 
   const categoryNames = new Map(data.categories.map((c) => [c.id, c.name]));
@@ -582,7 +753,7 @@ function CountsView({ data, unit, entities, cutoffIndex }: ViewProps) {
     note: categoryNames.get(action.categoryId),
     value: rows.reduce(
       (total, row) => total + (row.byAction.get(action.id) ?? 0),
-      0
+      0,
     ),
   }));
 
@@ -614,10 +785,19 @@ function CountsView({ data, unit, entities, cutoffIndex }: ViewProps) {
           <thead>
             <tr>
               <Th sticky rowSpan={2}>
-                {unit === "user" ? "ユーザー" : "チーム"}
+                <EntitySortButtons
+                  unit={unit}
+                  sort={sort}
+                  onSort={onSort}
+                ></EntitySortButtons>
               </Th>
               <Th right rowSpan={2}>
-                合計
+                <SortButton
+                  label="合計"
+                  sortKey="total"
+                  sort={sort}
+                  onSort={onSort}
+                ></SortButton>
               </Th>
               {categoryGroups.map((group) => (
                 <th
@@ -640,6 +820,14 @@ function CountsView({ data, unit, entities, cutoffIndex }: ViewProps) {
                   </span>
                   <span className="text-muted-foreground">
                     {action.point}pt
+                  </span>
+                  <span className="block">
+                    <SortButton
+                      label="並べ替え"
+                      sortKey={`action:${action.id}`}
+                      sort={sort}
+                      onSort={onSort}
+                    ></SortButton>
                   </span>
                 </th>
               ))}
@@ -695,7 +883,7 @@ function DetailView({
   const pointSeries = useMemo(() => buildPointSeries(data, unit), [data, unit]);
   const dailyActions = useMemo(
     () => buildDailyActions(data, unit, selectedKey),
-    [data, unit, selectedKey]
+    [data, unit, selectedKey],
   );
 
   const entity = entities.find((e) => e.key === selectedKey);
@@ -749,9 +937,11 @@ function DetailView({
           days={visibleDays}
           values={(chartMetric === "steps" ? series.steps : series.daily).slice(
             0,
-            cutoffIndex + 1
+            cutoffIndex + 1,
           )}
-          seriesName={chartMetric === "steps" ? "その日の歩数" : "その日のポイント"}
+          seriesName={
+            chartMetric === "steps" ? "その日の歩数" : "その日のポイント"
+          }
           unitLabel={chartMetric === "steps" ? "歩" : "pt"}
         ></ColumnChart>
       </Panel>
@@ -839,6 +1029,85 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// 表の見出しに置く、並べ替えのボタン。並べ替え中の列には矢印を出す
+function SortButton({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  compact = false,
+}: SortProps & {
+  label: string;
+  sortKey: string;
+  // 日付の列のように数が多いところでは、並べ替え中のときだけ矢印を出して幅を取らない
+  compact?: boolean;
+}) {
+  const isActive = sort.key === sortKey;
+  const isText = sortKey === "name" || sortKey === "team";
+  return (
+    <button
+      type="button"
+      title={`${label}で並べ替え`}
+      aria-pressed={isActive}
+      onClick={() =>
+        onSort(
+          isActive
+            ? { key: sortKey, desc: !sort.desc }
+            : // 数字の列は多い順、名前とチームは五十音順から始める
+              { key: sortKey, desc: !isText },
+        )
+      }
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded px-1 -mx-1 hover:bg-slate-200",
+        isActive && "text-foreground font-bold",
+      )}
+    >
+      {label}
+      {/* 矢印の文字は環境によって絵文字で表示されるため、アイコンを使う */}
+      {isActive ? (
+        sort.desc ? (
+          <ArrowDown className="h-3 w-3" aria-hidden />
+        ) : (
+          <ArrowUp className="h-3 w-3" aria-hidden />
+        )
+      ) : (
+        !compact && <ArrowUpDown className="h-3 w-3 opacity-50" aria-hidden />
+      )}
+    </button>
+  );
+}
+
+// 1 列目の見出し。ユーザー単位のときは、名前と所属チームのどちらでも並べ替えられる
+function EntitySortButtons({ unit, sort, onSort }: SortProps & { unit: Unit }) {
+  if (unit === "team") {
+    return (
+      <SortButton
+        label="チーム"
+        sortKey="name"
+        sort={sort.key === "team" ? { ...sort, key: "name" } : sort}
+        onSort={onSort}
+      ></SortButton>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-3">
+      <SortButton
+        label="名前"
+        sortKey="name"
+        sort={sort}
+        onSort={onSort}
+      ></SortButton>
+      <SortButton
+        label="チーム"
+        sortKey="team"
+        sort={sort}
+        onSort={onSort}
+      ></SortButton>
+    </span>
+  );
+}
+
 function Segmented({
   options,
   value,
@@ -858,7 +1127,7 @@ function Segmented({
           onClick={() => onChange(option.value)}
           className={cn(
             "h-7 rounded px-3 text-sm text-muted-foreground",
-            value === option.value && "bg-background text-foreground shadow"
+            value === option.value && "bg-background text-foreground shadow",
           )}
         >
           {option.label}
@@ -916,7 +1185,7 @@ function Th({
       className={cn(
         "px-3 py-1.5 text-xs font-medium text-muted-foreground whitespace-nowrap bg-slate-50",
         right ? "text-right" : "text-left",
-        sticky && "sticky left-0 z-[1]"
+        sticky && "sticky left-0 z-[1]",
       )}
     >
       {children}
@@ -944,7 +1213,7 @@ function Td({
         right && "text-right",
         sticky && "sticky left-0 z-[1] bg-white",
         bold && "font-bold",
-        muted && "text-slate-400"
+        muted && "text-slate-400",
       )}
     >
       {children}
