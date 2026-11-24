@@ -155,26 +155,37 @@ export function ActionHome({
               disabled={renderProps.isDisabled}
             ></NewActionModal>
           )}
-          renderEditTask={(renderProps) => (
-            <ActionMenu action={actions.find((t) => renderProps.id === t.id)!}>
-              <EditActionModal
-                categories={categories}
-                category_id={renderProps.columnId as number}
-                updateAction={updateAction}
-                action={actions.find((t) => renderProps.id === t.id)!}
-              ></EditActionModal>
-            </ActionMenu>
-          )}
-          renderEditColumn={(renderProps) => (
-            <CategoryMenu
-              category={categories.find((c) => renderProps.id === c.id)!}
-            >
-              <EditCategoryModal
-                updateCategory={updateCategory}
-                category={categories.find((c) => renderProps.id === c.id)!}
-              ></EditCategoryModal>
-            </CategoryMenu>
-          )}
+          renderEditTask={(renderProps) => {
+            // アーカイブや削除の直後は、ボード側の表示が一拍遅れて残るため、見つからないことがある
+            const action = actions.find((t) => renderProps.id === t.id);
+            if (!action) {
+              return null;
+            }
+            return (
+              <ActionMenu action={action}>
+                <EditActionModal
+                  categories={categories}
+                  category_id={renderProps.columnId as number}
+                  updateAction={updateAction}
+                  action={action}
+                ></EditActionModal>
+              </ActionMenu>
+            );
+          }}
+          renderEditColumn={(renderProps) => {
+            const category = categories.find((c) => renderProps.id === c.id);
+            if (!category) {
+              return null;
+            }
+            return (
+              <CategoryMenu category={category}>
+                <EditCategoryModal
+                  updateCategory={updateCategory}
+                  category={category}
+                ></EditCategoryModal>
+              </CategoryMenu>
+            );
+          }}
           updateTaskOrders={updateTaskOrders}
         />
       </div>
