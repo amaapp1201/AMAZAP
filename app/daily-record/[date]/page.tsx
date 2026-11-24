@@ -7,10 +7,11 @@ import {
 import { auth } from "@/features/helpers/auth";
 
 export default async function Page({
-  params: { date },
+  params,
 }: {
-  params: { date: string };
+  params: Promise<{ date: string }>;
 }) {
+  const { date } = await params;
   const session = await auth();
 
   if (!session) {
