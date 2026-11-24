@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarHeart, Dumbbell, Link2, User, Users } from "lucide-react";
+import {
+  BarChart3,
+  CalendarHeart,
+  Dumbbell,
+  Link2,
+  User,
+  Users,
+} from "lucide-react";
 import { Route } from "next";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
@@ -37,6 +44,12 @@ export function Sidebar() {
           href="/admin/teams"
           label="チーム"
           isCurrent={segment === "teams"}
+        ></MenuItem>
+        <MenuItem
+          Icon={<BarChart3 className="h-5 w-5 mr-3 group-hover:text-white" />}
+          href="/admin/analytics"
+          label="分析"
+          isCurrent={segment === "analytics"}
         ></MenuItem>
       </ul>
     </div>
