@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-table";
 import { EditUserModal } from "./edit-user-modal";
 import { EditUserPasswordModal } from "./edit-user-password-modal";
+import { DeleteUserModal } from "./delete-user-modal";
 import { useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "../ui/button";
@@ -36,6 +37,9 @@ export function UserTable({
   users,
   updateUser,
   updateUserPassword,
+  deleteUser,
+  getUserRecordCount,
+  currentUserId,
   teams,
 }: {
   users: User[];
@@ -50,6 +54,9 @@ export function UserTable({
     userId: string;
     password: string;
   }) => Promise<any>;
+  deleteUser: (userId: string) => Promise<{ failure: string } | void>;
+  getUserRecordCount: (userId: string) => Promise<number>;
+  currentUserId: string;
   teams: {
     id: number;
     name: string;
@@ -133,6 +140,19 @@ export function UserTable({
             }}
             updateUserPassword={updateUserPassword}
           ></EditUserPasswordModal>
+          <DeleteUserModal
+            user={{
+              userId: row.original.user_id ?? "",
+              name: row.original.user_name ?? "",
+            }}
+            deleteUser={deleteUser}
+            getUserRecordCount={getUserRecordCount}
+            disabledReason={
+              row.original.user_id === currentUserId
+                ? "ログイン中の自分自身は削除できません"
+                : undefined
+            }
+          ></DeleteUserModal>
         </div>
       ),
     },

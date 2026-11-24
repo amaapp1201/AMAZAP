@@ -1,7 +1,10 @@
+import { auth } from "@/features/helpers/auth";
 import { getTeams } from "@/features/team-page/team-service";
 import { UserHome } from "@/features/user-page/user-home";
 import {
   createUser,
+  deleteUser,
+  getUserRecordCount,
   getUsers,
   updateUser,
   updateUserPassword,
@@ -34,6 +37,8 @@ export default async function Page({
     pageSize: 1000,
   });
 
+  const session = await auth();
+
   const totalPages = Math.ceil(count / pageSize);
   return (
     <UserHome
@@ -43,6 +48,9 @@ export default async function Page({
       searchTerm={decodedSearchTerm}
       updateUser={updateUser}
       updateUserPassword={updateUserPassword}
+      deleteUser={deleteUser}
+      getUserRecordCount={getUserRecordCount}
+      currentUserId={session?.user.id ?? ""}
       createNewUser={createUser}
       pageSize={pageSize}
       teams={teams}

@@ -9,6 +9,9 @@ export function UserHome({
   teams,
   updateUser,
   updateUserPassword,
+  deleteUser,
+  getUserRecordCount,
+  currentUserId,
   createNewUser,
   currentPage,
   totalPages,
@@ -34,6 +37,9 @@ export function UserHome({
     userId: string;
     password: string;
   }) => Promise<any>;
+  deleteUser: (userId: string) => Promise<{ failure: string } | void>;
+  getUserRecordCount: (userId: string) => Promise<number>;
+  currentUserId: string;
   createNewUser: (data: {
     teamId: number | null;
     name: string;
@@ -76,6 +82,9 @@ export function UserHome({
           teams={teams}
           updateUser={updateUser}
           updateUserPassword={updateUserPassword}
+          deleteUser={deleteUser}
+          getUserRecordCount={getUserRecordCount}
+          currentUserId={currentUserId}
         ></UserTable>
       )}
 
