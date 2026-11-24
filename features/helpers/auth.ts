@@ -16,7 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   providers: [
     CredentialsProvider({
-      name: "Email and Password",
+      name: "Name and Password",
       credentials: {
         name: {
           label: "name",
@@ -43,14 +43,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .single();
 
         if (error || !user) {
-          throw new Error("メールアドレスまたはパスワードが正しくありません");
+          throw new Error("名前またはパスワードが正しくありません");
         }
 
         // パスワードの検証
         const isValidPassword = await bcrypt.compare(password, user.password);
 
         if (!isValidPassword) {
-          throw new Error("メールアドレスまたはパスワードが正しくありません");
+          throw new Error("名前またはパスワードが正しくありません");
         }
 
         // Return the authenticated user
