@@ -4,10 +4,11 @@ import { isYesterdayInLocal } from "@/features/helpers/utils";
 import { auth } from "@/features/helpers/auth";
 
 export default async function Page({
-  params: { eventId },
+  params,
 }: {
-  params: { eventId: number };
+  params: Promise<{ eventId: string }>;
 }) {
+  const eventId = Number((await params).eventId);
   const session = await auth();
 
   if (!session) {

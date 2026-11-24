@@ -8,13 +8,14 @@ import {
 const pageSize = 50;
 
 export default async function Page({
-  searchParams: { page, searchTerm },
+  searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     page?: string; // nextjsではstring型で渡される
     searchTerm?: string;
-  };
+  }>;
 }) {
+  const { page, searchTerm } = await searchParams;
   const currentPage = page ? Number(page) : 1;
 
   const decodedSearchTerm = searchTerm

@@ -12,7 +12,7 @@
 
 ## 使っている技術
 
-- [Next.js](https://nextjs.org/) 14（App Router）と TypeScript
+- [Next.js](https://nextjs.org/) 15（App Router）、React 19、TypeScript
 - [Supabase](https://supabase.com/)（PostgreSQL。行レベルセキュリティでアクセスを制御）
 - [NextAuth.js](https://authjs.dev/) v5（名前とパスワードでログイン）
 - Tailwind CSS と shadcn/ui

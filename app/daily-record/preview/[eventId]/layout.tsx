@@ -7,11 +7,12 @@ import { ReactNode } from "react";
 
 export default async function Layout({
   children,
-  params: { eventId },
+  params,
 }: {
   children: ReactNode;
-  params: { eventId: number };
+  params: Promise<{ eventId: string }>;
 }) {
+  const eventId = Number((await params).eventId);
   const session = await auth();
 
   // midddlewareを通過してるのでsessionが存在するはず
