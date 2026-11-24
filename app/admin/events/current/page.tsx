@@ -1,7 +1,7 @@
 import { getCategories } from "@/features/action-page/category-service";
 import { CurrentEventHome } from "@/features/event-page/current-event-home";
 import {
-  getCurrentEvent,
+  getCurrentEvents,
   archiveEvent,
   updateEvent,
   updateRankVisible,
@@ -10,7 +10,7 @@ import {
 import { getTeams } from "@/features/team-page/team-service";
 
 export default async function Page() {
-  const currentEvent = await getCurrentEvent();
+  const currentEvents = await getCurrentEvents();
   const categories = await getCategories();
   const { teams } = await getTeams({
     pageSize: 1000,
@@ -18,7 +18,7 @@ export default async function Page() {
 
   return (
     <CurrentEventHome
-      event={currentEvent}
+      events={currentEvents}
       updateEvent={updateEvent}
       teams={teams}
       categories={categories}
